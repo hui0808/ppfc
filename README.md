@@ -2,7 +2,7 @@
 
 A simple fc simulator implemented in c++11
 
-![](.\balloon.gif) ![](.\mario.gif) ![](.\F-1 Race.gif) 
+![](balloon.gif) ![](mario.gif) ![](F-1 Race.gif) 
 
 # INFO
 
