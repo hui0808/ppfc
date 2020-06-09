@@ -20,11 +20,11 @@ void CPU::init(void) {
 void CPU::reset(void) {
 	// http://wiki.nesdev.com/w/index.php/CPU_power_up_state
 	this->pc = this->memory.readw(VERCTOR_RESET);
+	this->cycle = cpuOptCycles[this->memory.read(this->pc)];
 	this->p.i = 1;
 	this->nmi = 0;
 	this->irq = 0;
 	this->preNmi = 0;
-	this->cycle = 0;
 	this->sp -= 0x03;
 }
 
@@ -41,11 +41,15 @@ void CPU::memoryInit(void) {
 
 void CPU::cpulog(const char* op, const char* addrmode, uint32_t addr, uint8_t no, uint16_t pc) {
 	this->count++;
-	printf("%04ld ", this->count);
-	printf("$%04X  %s %s $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X oamaddr:%d",
-		pc, op, addrmode, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.oamaddr);
-	addr == ACCIMPID ? printf(" -001") : printf(" %04X", addr);
-	putchar('\n');
+	if (this->count >= 300000) {
+		printf("%04ld ", this->count);
+		//printf("$%04X  %s %s $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
+		//	pc, op, addrmode, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
+		printf("$%04X $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
+			pc, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
+		addr == ACCIMPID ? printf(" -001") : printf(" %04X", addr);
+		putchar('\n');
+	}
 }
 
 #if 0
@@ -59,7 +63,6 @@ case 0x##no: { \
 	uint32_t addr = this->addr_##address(); \
 	CPULOG(#op, #address, addr, 0x##no, pc); \
 	this->opt_##op(addr); \
-	this->cycle += cyc; \
 	break; \
 }
 
@@ -67,7 +70,7 @@ case 0x##no: { \
 
 void CPU::run(void) {
     CHECK_NMI();
-	if (this->cycle == 0) {
+	if (--this->cycle == 0) {
 		uint8_t optcode = this->memory.read(this->pc);
 		uint16_t pc = this->pc;
 		this->pc++;
@@ -77,8 +80,7 @@ void CPU::run(void) {
 		this->pageCrossed = false;
 		this->handleNmi();
 		this->handleIrq();
-	} else {
-		this->cycle--;
+		this->cycle += cpuOptCycles[this->memory.read(this->pc)];
 	}
 }
 
@@ -293,56 +295,64 @@ void CPU::opt_JSR(uint32_t address) {
 
 void CPU::opt_BVC(uint32_t address) {
 	if (!this->p.v){
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BVS(uint32_t address) {
 	if (this->p.v) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BPL(uint32_t address) {
 	if (!this->p.s) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BMI(uint32_t address) {
 	if (this->p.s) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BCC(uint32_t address) {
 	if (!this->p.c) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BCS(uint32_t address) {
 	if (this->p.c) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BNE(uint32_t address) {
 	if (!this->p.z) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
 
 void CPU::opt_BEQ(uint32_t address) {
 	if (this->p.z) {
-		this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
+		this->cycle += ((address & 0xFF00) != (this->pc & 0xFF00)) + 1;
+		//this->cycle += (((address ^ this->pc) & 0x0100) == 0x0100) + 1;
 		this->pc = address;
 	}
 }
@@ -576,7 +586,7 @@ void CPU::opt_INC(uint32_t address) {
 void CPU::opt_SBC(uint32_t address) {
 	uint8_t src = this->memory.read(address);
 	uint16_t res = this->a - src - (this->p.c == 0);
-	this->p.c = (res & 0x80) == 0;
+	this->p.c = res < 0x100;
 	this->p.v = (((this->a ^ src) & 0x80) and ((this->a ^ uint8_t(res)) & 0x80));
 	this->a = res;
 	this->checkZSFlag(this->a);

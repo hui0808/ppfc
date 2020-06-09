@@ -52,15 +52,12 @@ struct PPUOAM {
 
 const union Palette {
     struct {
-        uint8_t a : 8; // rgba high ---> low
+        uint8_t a : 8;
         uint8_t b : 8;
         uint8_t g : 8;
         uint8_t r : 8;
     };
     uint32_t rgba;
-} gpalette[64]{
-    #define COLOR(r, g, b, a) {a, b, g, r},
-    #include "palette.h"
 };
 
 class PPU {
@@ -76,8 +73,7 @@ public:
     uint16_t vaddr; // Address ($2006) >> write x2
     uint8_t spindexes[32] = {0}; // 调色板索引
     uint8_t oam[256] = {0}; // 精灵数据, 有64个4 byte 精灵
-
-    uint32_t palette[32] = {0}; // 调色板缓存
+	Palette palette[64] = {0}; // 调色板
     uint32_t *buffer; // 显示缓存
     uint32_t *buf;
 
@@ -126,9 +122,11 @@ public:
     void regWrite(uint32_t addr, uint8_t byte);
     void dma(uint32_t addr, uint8_t byte);
     uint16_t getDmaAddr(uint8_t data);
+	void colorEmphasis(uint8_t flag);
 };
 
-
+extern const Palette gpalette[64];
+extern const uint16_t colorEmphasisFactor[8][3];
 
 #endif // __PPFC_PPU_H__
 

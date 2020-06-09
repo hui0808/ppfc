@@ -14,9 +14,9 @@ public:
 
 	SDL_Window *window;
 	SDL_Renderer *renderer;
-	SDL_Surface *screen;
 	SDL_Texture *texture;
 	SDL_Event event;
+	SDL_SpinLock lock;
 	uint32_t frame;
 
 	Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height);
@@ -25,6 +25,7 @@ public:
 	void clear(void);
 	void render(void);
 	void quit(void);
+	void resize(SDL_Event& event);
 };
 
 #endif // __PPFC_SCREEN_H__

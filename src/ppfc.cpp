@@ -34,14 +34,15 @@ void PPFC::run(void) {
 		switch (this->status) {
 		case(PPFC_RUN):
 			do {
-				this->cpu.run();
 				this->ppu.run();
 				this->ppu.run();
 				this->ppu.run();
 				this->cpu.run();
+
 				this->ppu.run();
 				this->ppu.run();
 				this->ppu.run();
+				this->cpu.run();
 			} while (!(this->ppu.frameClock >= NTSC_CYCLES * 241 + 1 
 				&& this->ppu.frameClock <= NTSC_CYCLES * 241 + 6));
 			break;
@@ -54,10 +55,6 @@ void PPFC::run(void) {
 		this->handleEvent();
 	}
 	this->quit();
-}
-
-void PPFC::renderFrame(void) {
-
 }
 
 

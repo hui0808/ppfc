@@ -34,7 +34,6 @@ public:
 	PPFC(const char* path);
 	void init(void);
 	void run(void);
-    void renderFrame(void);
 	void beforeRun(void);
 	void handleEvent(void);
 	void registerFunc(uint16_t eventType, EventCallBack callback);

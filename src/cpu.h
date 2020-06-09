@@ -191,4 +191,9 @@ inline uint32_t CPU::addr_REL(void) { // 相对寻址
 	return addr;
 }
 
+const uint8_t cpuOptCycles[256]{
+	#define OP(opt, addrmode, cycles, no) cycles,
+	#include "instruction.h"
+};
+
 #endif // __PPFC_CPU_H__

@@ -13,6 +13,7 @@ PPU::PPU(PPFC& bus) :bus(bus), memory(16384) {
 	this->cycle = 0;
 	this->buffer = new uint32_t[256 * 240]();
 	this->buf = this->buffer;
+	memcpy(this->palette, gpalette, sizeof(gpalette));
 }
 
 PPU::~PPU() {
@@ -64,7 +65,7 @@ void PPU::memoryInit() {
 }
 
 void PPU::run(void) {
-	if (this->scanline < NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
+	if (this->frameClock < NTSC_CYCLES * NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
 		if (this->cycle < 256) { // cycle 0~255 visible scanlines render
 			this->render();
 		} else if (this->cycle == 320) { // sprite evaluation
@@ -76,39 +77,35 @@ void PPU::run(void) {
 				this->yInc();
 			}
 		}
-	} else if (this->scanline == NTSC_VBLANK) { // set vblank flag 241
-		if (this->cycle == 0) {
-			this->preVblank = this->status.vblank;
-			this->status.vblank = 1;
-			this->buffer = this->buf; // reset to (0, 0)
+	} else if (this->frameClock == NTSC_CYCLES * NTSC_VBLANK + 0) { // set vblank flag 241
+		this->preVblank = this->status.vblank;
+		this->status.vblank = 1;
+		this->buffer = this->buf; // reset to (0, 0)
+	} else if (this->frameClock == NTSC_CYCLES * NTSC_PRERENDER_LINE + 0) { // pre-render line 261 cycle 1 clear vblank
+		this->preVblank = this->status.vblank;
+		this->status.vblank = 0;
+		this->status.spr0Hit = 0;
+		this->status.sprOver = 0;
+		if (this->mask.background || this->mask.sprite) {
+			this->vaddr = this->tmpvaddr;
+			this->finex = this->tmpfinex;
 		}
-	} else if (this->scanline == NTSC_PRERENDER_LINE) { // pre-render line 261
-		if (this->cycle == 0) { // cycle 1 clear vblank
-			this->preVblank = this->status.vblank;
-			this->status.vblank = 0;
-			this->status.spr0Hit = 0;
-			this->status.sprOver = 0;
-			if (this->mask.background || this->mask.sprite) {
-				this->vaddr = this->tmpvaddr;
-				this->finex = this->tmpfinex;
-			}
-		} else if (this->cycle == NTSC_CYCLES - 2) {
-			if (this->odd && (this->mask.background || this->mask.sprite)) {
-				this->frameClock = 0;
-				this->cycle = 0;
-				this->scanline = 0;
-				this->odd = 0;
-				return;
-			}
-		} else if (this->cycle == NTSC_CYCLES - 1) {
+	} else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 2) {
+		if (this->odd && (this->mask.background || this->mask.sprite)) {
 			this->frameClock = 0;
 			this->cycle = 0;
 			this->scanline = 0;
-			if (this->mask.background || this->mask.sprite) {
-				this->odd = 1;
-			}
+			this->odd = 0;
 			return;
 		}
+	} else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 1) {
+		this->frameClock = 0;
+		this->cycle = 0;
+		this->scanline = 0;
+		if (this->mask.background || this->mask.sprite) {
+			this->odd = 1;
+		}
+		return;
 	}
 	this->frameRateLimit();
 	this->frameClock++;
@@ -118,6 +115,62 @@ void PPU::run(void) {
 		this->scanline++;
 	}
 }
+
+//void PPU::run(void) {
+//	if (this->scanline < NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
+//		if (this->cycle < 256) { // cycle 0~255 visible scanlines render
+//			this->render();
+//		} else if (this->cycle == 320) { // sprite evaluation
+//			if (this->mask.background || this->mask.sprite) {
+//				this->spriteEvaluate();
+//				this->vaddr &= ~0x041F;
+//				this->vaddr |= (this->tmpvaddr & 0x041F);
+//				this->finex = this->tmpfinex;
+//				this->yInc();
+//			}
+//		}
+//	} else if (this->scanline == NTSC_VBLANK) { // set vblank flag 241
+//		if (this->cycle == 0) {
+//			this->preVblank = this->status.vblank;
+//			this->status.vblank = 1;
+//			this->buffer = this->buf; // reset to (0, 0)
+//		}
+//	} else if (this->scanline == NTSC_PRERENDER_LINE) { // pre-render line 261
+//		if (this->cycle == 0) { // cycle 1 clear vblank
+//			this->preVblank = this->status.vblank;
+//			this->status.vblank = 0;
+//			this->status.spr0Hit = 0;
+//			this->status.sprOver = 0;
+//			if (this->mask.background || this->mask.sprite) {
+//				this->vaddr = this->tmpvaddr;
+//				this->finex = this->tmpfinex;
+//			}
+//		} else if (this->cycle == NTSC_CYCLES - 2) {
+//			if (this->odd && (this->mask.background || this->mask.sprite)) {
+//				this->frameClock = 0;
+//				this->cycle = 0;
+//				this->scanline = 0;
+//				this->odd = 0;
+//				return;
+//			}
+//		} else if (this->cycle == NTSC_CYCLES - 1) {
+//			this->frameClock = 0;
+//			this->cycle = 0;
+//			this->scanline = 0;
+//			if (this->mask.background || this->mask.sprite) {
+//				this->odd = 1;
+//			}
+//			return;
+//		}
+//	}
+//	this->frameRateLimit();
+//	this->frameClock++;
+//	this->cycle++;
+//	if (this->cycle == NTSC_CYCLES) {
+//		this->cycle = 0;
+//		this->scanline++;
+//	}
+//}
 
 void PPU::render(void) {
 	// Visible scanlines render
@@ -152,7 +205,7 @@ void PPU::render(void) {
 	} else if ((this->vaddr & 0x3F00) == 0x3F00) {
 		this->pixel = this->vaddr & 0x1F;
 	}
-	uint32_t color = gpalette[this->spindexes[this->pixel]].rgba;
+	uint32_t color = this->palette[this->spindexes[this->pixel]].rgba;
 	*this->buffer++ = color;
 }
 
@@ -229,10 +282,6 @@ void PPU::spriteEvaluate(void) {
 	if (this->scanline >= oam->y && this->scanline < oam->y + high)
 		this->sprZero = secOam;
 
-	if (this->vaddr == 0x06c3) {
-		printf("");
-	}
-
 	do {
 		if (this->scanline >= oam->y && this->scanline < oam->y + high) {
 			tile = oam->tileIndex;
@@ -253,9 +302,6 @@ void PPU::spriteEvaluate(void) {
 					}
 					break;
 			}
-			// for secOam[this->sprNum * 4 + 2], only h&p&c (hflip, background priority & upper two bits of colour)
-			// is useful for sprite rendering, so I store these four bits in upper bits of this byte,
-			// the lower bits of this byte I will use to counter how many horizontal pixels has been rendered
 			*secOam++ = this->memory.read(patAddr + tile * 16 + y);
 			*secOam++ = this->memory.read(patAddr + tile * 16 + 8 + y);
 			*secOam++ = ((oam->attr << 1) & 0xC0) | ((oam->attr << 4) & 0x30);
@@ -406,17 +452,16 @@ void PPU::regWrite(uint32_t addr, uint8_t byte) {
 			this->tmpvaddr |= (byte & 0x03) << 10;
 			break;
 		case(1): // $2001 PPU掩码寄存器
-			// TODO: update palette
-			//if ((this->mask.mask & 0xE1) != (byte & 0xE1)) {
-			//	this->setPal();
-			//}
-			this->mask.mask = byte; break;
+			if ((this->mask.mask & 0xE1) != (byte & 0xE1)) {
+				this->colorEmphasis(byte & 0xE1);
+			}
+			this->mask.mask = byte; 
+			break;
 		case(2): // $2002 PPU状态寄存器
 			error("PPU: status register is read-only!");
 		case(3): // $2003 OAM 数据端口 精灵RAM的8位指针
 			this->oamaddr = byte; break;
 		case(4): // $2004 OAM 数据端口 精灵RAM数据
-			printf("oam");
 			this->oam[this->oamaddr++] = byte; 
 			break;
 		case(5): // $2005 PPU 滚动位置寄存器
@@ -463,17 +508,12 @@ void PPU::regWrite(uint32_t addr, uint8_t byte) {
 }
 
 void PPU::dma(uint32_t addr, uint8_t byte) {
-	uint16_t i;
-	uint16_t src = this->getDmaAddr(byte);
-	for (i = 0; i < 256; i++) {
-		uint8_t data = this->bus.cpu.memory.read(src + i);
-		if (data == 0xf8) {
-			data = this->cycle;
-		}
-		this->oam[this->oamaddr++] = data;
+	uint16_t src = byte * 256;
+	for (uint16_t i = 0; i < 256; i++) {
+		this->oam[this->oamaddr++] = this->bus.cpu.memory.read(src + i);
 	}
-	this->bus.cpu.cycle += 513;
-	this->bus.cpu.cycle += this->bus.cpu.cycle & 0x01;
+	this->bus.cpu.cycle += 512;
+	//this->bus.cpu.cycle += this->bus.cpu.cycle & 0x01;
 }
 
 uint16_t PPU::getDmaAddr(uint8_t data) {
@@ -496,3 +536,59 @@ uint16_t PPU::getDmaAddr(uint8_t data) {
 	}
 	error(format("PPU: get dma address error %0#6X!", data));
 }
+
+void PPU::colorEmphasis(uint8_t flag) {
+	const Palette *src = gpalette;
+	Palette *dst = this->palette;
+	uint8_t factor = flag >> 5;
+	bool gray = flag & 0x01;
+	uint8_t r, g, b, a;
+	for (uint8_t i = 0; i < 64; i++) {
+		if (gray) {
+			r = g = b = (src[i].r * 77 + src[i].g * 150 + src[i].b * 29) >> 8;
+		} else {
+			r = src[i].r;
+			g = src[i].g;
+			b = src[i].b;
+		}
+		a = src[i].a;
+
+		r = (r * colorEmphasisFactor[factor][0]) >> 8;
+		g = (g * colorEmphasisFactor[factor][1]) >> 8;
+		b = (b * colorEmphasisFactor[factor][2]) >> 8;
+		r = (r < 255) ? r : 255;
+		g = (g < 255) ? g : 255;
+		b = (b < 255) ? b : 255;
+		dst[i].r = r;
+		dst[i].g = g;
+		dst[i].b = b;
+		dst[i].a = a;
+	}
+}
+
+const Palette gpalette[64] = 
+{
+	#define COLOR(r, g, b, a) {a, b, g, r},
+	#include "palette.h"
+};
+
+/*
+001   R: 123.9%   G: 091.5%   B: 074.3%
+010   R: 079.4%   G: 108.6%   B: 088.2%
+011   R: 101.9%   G: 098.0%   B: 065.3%
+100   R: 090.5%   G: 102.6%   B: 127.7%
+101   R: 102.3%   G: 090.8%   B: 097.9%
+110   R: 074.1%   G: 098.7%   B: 100.1%
+111   R: 075.0%   G: 075.0%   B: 075.0%
+*/
+const uint16_t colorEmphasisFactor[8][3] = 
+{
+	{ 256, 256, 256 },
+	{ 317, 234, 190 },
+	{ 203, 278, 225 },
+	{ 261, 251, 167 },
+	{ 232, 263, 327 },
+	{ 262, 232, 251 },
+	{ 190, 253, 256 },
+	{ 192, 192, 192 },
+};

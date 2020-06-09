@@ -4,10 +4,6 @@
 #include <string>
 #include <iostream>
 
-#define READBIND(func) [this](uint32_t addr) { return func(addr); }
-#define WRITEBIND(func) [this](uint32_t addr, uint8_t byte) { func(addr, byte); }
-#define EVENTBIND(func) [this](SDL_Event& e) { func(e); }
-
 template<class T>
 void _print(T arg) {
 	std::cout << arg << " ";
@@ -29,24 +25,6 @@ std::string format(const char* format_, Args... args) {
 	delete[] buf;
 	return str;
 }
-
-template<class... Args>
-void ensure_(bool condition, const char* file, const char* func, int line, Args... message) {
-	if (not condition) {
-		log("*** ≤‚ ‘ ß∞‹: ", message..., format("%s:%s:%d", file, func, line));
-	} else {
-		log("||| ≤‚ ‘≥…π¶");
-	}
-}
-
-#define ensure(condition, ...) \
-do{ \
-    if (!(condition)) { \
-        log("*** ≤‚ ‘ ß∞‹: ", ##__VA_ARGS__, format("%s:%s:%d", __FILE__, __func__, __LINE__)); \
-    } else { \
-        log("||| ≤‚ ‘≥…π¶"); \
-    } \
-}while(0)
 
 #define error(...) \
 do{ \

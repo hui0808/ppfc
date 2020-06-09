@@ -15,7 +15,7 @@ void Screen::init(void) {
 		SDL_WINDOWPOS_UNDEFINED,
 		width,
 		height,
-		SDL_WINDOW_SHOWN
+		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
 	);
 
 	this->renderer = SDL_CreateRenderer(this->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -26,6 +26,8 @@ void Screen::init(void) {
 		width,
 		height
 	);
+
+	this->bus.registerFunc(SDL_WINDOWEVENT, EVENTBIND(this->resize));
 }
 
 void Screen::updata(uint32_t *buffer) {
@@ -43,12 +45,31 @@ void Screen::clear(void) {
 }
 
 void Screen::render(void) {
-	int i = SDL_RenderCopy(this->renderer, this->texture, NULL, NULL);
+	SDL_AtomicLock(&this->lock);
+	SDL_RenderCopy(this->renderer, this->texture, NULL, NULL);
 	SDL_RenderPresent(this->renderer);
+	SDL_AtomicUnlock(&this->lock);
 }
 
 void Screen::quit(void) {
 	SDL_DestroyTexture(this->texture);
 	SDL_DestroyRenderer(this->renderer);
 	SDL_DestroyWindow(this->window);
+}
+
+void Screen::resize(SDL_Event& event) {
+	if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+		SDL_AtomicLock(&this->lock);
+		SDL_SetWindowSize(this->window, event.window.data1, event.window.data2);
+		SDL_DestroyTexture(this->texture);
+		this->texture = SDL_CreateTexture(
+			this->renderer,
+			SDL_PIXELFORMAT_RGBA8888,
+			SDL_TEXTUREACCESS_STREAMING,
+			this->width,
+			this->height
+		);
+		SDL_SetRenderTarget(this->renderer, this->texture);
+		SDL_AtomicUnlock(&this->lock);
+	}
 }
