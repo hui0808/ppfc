@@ -72,6 +72,7 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 - [ ] Save/Load
 - [ ] APU
 - [ ] Trainer (金手指)
+- [ ] 将该项目移植到stm32或esp32上运行
 
 ## Reference
 
