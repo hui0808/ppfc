@@ -1,6 +1,6 @@
 # PPFC
 
-A simple fc simulator implemented in c++11
+A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 
 ![](balloon.gif) ![](mario.gif) ![](F-1-Race.gif) 
 
@@ -8,6 +8,7 @@ A simple fc simulator implemented in c++11
 
 - 目前仅支持Mapper000，但并不保证其所有游戏能玩
 - 支持自适应窗口
+- 支持Linux平台，不过仅在Ubuntu18上测试过
 
 # Usage
 
@@ -52,11 +53,19 @@ A simple fc simulator implemented in c++11
 
 - SDL2-2.0.12
 - vs2017
-- Win10
+- Windowns 10
 
-# make
+# Make
 
-本项目使用`vs2017`，用`Release x86`生成解决方案，然后将library/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
+- Windowns: 本项目使用`vs2017`，用`Release x86`生成解决方案，然后将library/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
+
+- Linux: 需要另外安装SDL2
+
+  ```
+  git clone https://github.com/hui0808/ppfc.git
+  cd ppfc
+  g++ -o ppfc src/*.cpp -std=c++11 -lpthread $(sdl2-config --cflags --libs)
+  ```
 
 # TODO
 

@@ -41,22 +41,14 @@ void CPU::memoryInit(void) {
 
 void CPU::cpulog(const char* op, const char* addrmode, uint32_t addr, uint8_t no, uint16_t pc) {
 	this->count++;
-	if (this->count >= 300000) {
-		printf("%04ld ", this->count);
-		//printf("$%04X  %s %s $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
-		//	pc, op, addrmode, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
-		printf("$%04X $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
-			pc, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
-		addr == ACCIMPID ? printf(" -001") : printf(" %04X", addr);
-		putchar('\n');
-	}
+	printf("%04d ", this->count);
+	//printf("$%04X %s %s $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
+	//	pc, op, addrmode, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
+	printf("$%04X $%02X A:%02X X:%02X Y:%02X P:%02X SP:%02X ctrl:%02X mask:%02X status:%02X vaddr:%04X cycle:%03d line:%03d",
+		pc, no, this->a, this->x, this->y, this->p.status, this->sp, this->bus.ppu.ctrl.ctrl, this->bus.ppu.mask.mask, this->bus.ppu.status.status, this->bus.ppu.vaddr, this->bus.ppu.cycle, this->bus.ppu.scanline);
+	addr == ACCIMPID ? printf(" -001") : printf(" %04X", addr);
+	putchar('\n');
 }
-
-#if 0
-#define CPULOG(op, address, addr, no, pc) this->cpulog(op, address, addr, no, pc)
-#else
-#define CPULOG(...)
-#endif
 
 #define OP(op, address, cyc, no) \
 case 0x##no: { \

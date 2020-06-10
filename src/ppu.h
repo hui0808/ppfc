@@ -50,7 +50,7 @@ struct PPUOAM {
     uint8_t x : 8;
 };
 
-const union Palette {
+union Palette {
     struct {
         uint8_t a : 8;
         uint8_t b : 8;

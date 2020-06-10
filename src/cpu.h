@@ -4,6 +4,13 @@
 #include "common.h"
 #include "memory.h"
 
+#ifdef CPULOG
+#undef CPULOG
+#define CPULOG(op, address, addr, no, pc) this->cpulog(op, address, addr, no, pc)
+#else
+#define CPULOG(...)
+#endif // CPULOG
+
 class PPFC;
 
 #define ACCIMPID UINT32_MAX // 用于标记ACC和IMP寻址

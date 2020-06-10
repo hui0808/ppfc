@@ -17,7 +17,7 @@ public:
 	SDL_Texture *texture;
 	SDL_Event event;
 	SDL_SpinLock lock;
-	uint32_t frame;
+	SDL_mutex *mutex;
 
 	Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height);
 	void init(void);

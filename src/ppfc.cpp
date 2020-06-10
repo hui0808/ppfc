@@ -23,12 +23,12 @@ void PPFC::run(void) {
 	this->beforeRun();
 	this->status = PPFC_RUN;
 
-	std::thread([this]() {
+	std::thread t([this]() {
 		while (this->status != PPFC_STOP) {
 			this->screen.updata(this->ppu.buf);
 			this->screen.render();
 		}
-	}).detach();
+	});
 
 	while (this->status != PPFC_STOP) {
 		switch (this->status) {
@@ -38,7 +38,6 @@ void PPFC::run(void) {
 				this->ppu.run();
 				this->ppu.run();
 				this->cpu.run();
-
 				this->ppu.run();
 				this->ppu.run();
 				this->ppu.run();
@@ -54,6 +53,7 @@ void PPFC::run(void) {
 		}
 		this->handleEvent();
 	}
+	t.join();
 	this->quit();
 }
 

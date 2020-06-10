@@ -13,8 +13,15 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include "SDL.h"
+#include <exception>
 #include "config.h"
 #include "utils.h"
+
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(WIN64) || defined(_WIN64) || defined(_WIN64_)
+#include "SDL.h" // Windows
+#elif defined(__linux__)
+#include <SDL2/SDL.h> // Linux
+#endif
+
 
 #endif // __PPFU_COMMON_H__

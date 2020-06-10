@@ -1,3 +1,4 @@
+//#define CPULOG
 #include "ppfc.h"
 
 int main(int argc, char *argv[]) {

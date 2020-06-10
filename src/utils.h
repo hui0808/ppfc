@@ -26,16 +26,18 @@ std::string format(const char* format_, Args... args) {
 	return str;
 }
 
-#define error(...) \
+#define error(info, ...) \
 do{ \
-    log(##__VA_ARGS__, format("%s:%s:%d", __FILE__, __func__, __LINE__)); \
+	printf("%s:%s:%d ", __FILE__, __func__, __LINE__); \
+    log(info, ##__VA_ARGS__); \
     exit(1); \
 }while(0)
 
 #define assert(condition, ...) \
 do{ \
     if (!(condition)) { \
-        log(##__VA_ARGS__, format("%s:%s:%d", __FILE__, __func__, __LINE__)); \
+		printf("%s:%s:%d", __FILE__, __func__, __LINE__); \
+        log("", ##__VA_ARGS__); \
         exit(1); \
     } \
 }while(0)
