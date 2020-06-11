@@ -8,7 +8,7 @@ Cartridge::Cartridge(const char* path) {
 	this->file = fopen(path, "rb");
 	assert(this->file != nullptr, "Cartridge: load nes file error!");
 	this->loadHeader();
-	if (this->flag1.trainer) { // ÔİÊ±Ìø¹ı½ğÊÖÖ¸
+	if (this->flag1.trainer) { // æš‚æ—¶è·³è¿‡é‡‘æ‰‹æŒ‡
 		fseek(this->file, 512, SEEK_CUR);
 	}
 	this->loadFlags();
@@ -26,9 +26,7 @@ Cartridge::~Cartridge() {
 void Cartridge::loadHeader(void) {
 	if (fread(&this->header, sizeof(CartridgeHeader), 1, this->file)) {
 		const char* id = "NES\x1a";
-		if (this->header.id != *((uint32_t*)id)) {
-			error("Cartridge: error nes file header!");
-		}
+		assert(this->header.id == *((uint32_t*)id), "Cartridge: error nes file header!");
 	}
 }
 

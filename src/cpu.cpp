@@ -53,7 +53,7 @@ void CPU::cpulog(const char* op, const char* addrmode, uint32_t addr, uint8_t no
 #define OP(op, address, cyc, no) \
 case 0x##no: { \
 	uint32_t addr = this->addr_##address(); \
-	CPULOG(#op, #address, addr, 0x##no, pc); \
+	CPULOG(#op, #address, addr, 0x##no, this->pc - 1); \
 	this->opt_##op(addr); \
 	break; \
 }
@@ -64,7 +64,6 @@ void CPU::run(void) {
     CHECK_NMI();
 	if (--this->cycle == 0) {
 		uint8_t optcode = this->memory.read(this->pc);
-		uint16_t pc = this->pc;
 		this->pc++;
 		switch (optcode) {
 			#include "instruction.h"
@@ -200,7 +199,7 @@ void CPU::opt_ISB(uint32_t address) {
 	this->memory.write(address, data);
 	uint8_t res = this->a - data - (this->p.c == 0);
 	this->p.c = res <= this->a;
-	this->p.v = (((this->a ^ data) & 0x80) and ((this->a ^ res) & 0x80));
+	this->p.v = (((this->a ^ data) & 0x80) && ((this->a ^ res) & 0x80));
 	this->a = res;
 	this->checkZSFlag(this->a);
 	this->cycle += this->pageCrossed;
@@ -579,7 +578,7 @@ void CPU::opt_SBC(uint32_t address) {
 	uint8_t src = this->memory.read(address);
 	uint16_t res = this->a - src - (this->p.c == 0);
 	this->p.c = res < 0x100;
-	this->p.v = (((this->a ^ src) & 0x80) and ((this->a ^ uint8_t(res)) & 0x80));
+	this->p.v = (((this->a ^ src) & 0x80) && ((this->a ^ uint8_t(res)) & 0x80));
 	this->a = res;
 	this->checkZSFlag(this->a);
 	this->cycle += this->pageCrossed;

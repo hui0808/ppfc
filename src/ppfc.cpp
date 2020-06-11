@@ -9,13 +9,13 @@ PPFC::PPFC(const char* path) :cartridge(path), cpu(*this),
 }
 
 void PPFC::init(void) {
-	registerFunc(SDL_QUIT, EVENTBIND(this->quit));
-
 	this->mapper.init();
 	this->cpu.init();
 	this->ppu.init();
 	this->screen.init();
 	this->keyboard.init();
+
+	registerFunc(SDL_QUIT, EVENTBIND(this->quit));
 }
 
 void PPFC::run(void) {

@@ -267,7 +267,7 @@ void PPU::spriteEvaluate(void) {
 	uint8_t tile;
 	uint8_t high = this->ctrl.sprSize ? 16 : 8;
 	uint8_t y;
-	uint16_t patAddr;
+	uint16_t patAddr = 0;
 	uint8_t onum = 0;
 	uint8_t oy = 0;
 	PPUOAM *oam = (PPUOAM*)this->oam;
@@ -483,7 +483,7 @@ void PPU::regWrite(uint32_t addr, uint8_t byte) {
 			if (this->toggle) {
 				this->tmpvaddr = ((this->tmpvaddr & 0x00FF) | (byte << 8)) & 0x3FFF;
 			} else {
-				this->tmpvaddr = (this->tmpvaddr & 0xFF00 | byte);
+				this->tmpvaddr = ((this->tmpvaddr & 0xFF00) | byte);
 				this->vaddr = this->tmpvaddr;
 			}
 			break;

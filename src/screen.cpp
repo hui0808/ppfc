@@ -8,7 +8,7 @@ Screen::Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height) :b
 }
 
 void Screen::init(void) {
-	// ´´½¨´°¿Ú 
+	// åˆ›å»ºçª—å£ 
 	this->window = SDL_CreateWindow(
 		title,
 		SDL_WINDOWPOS_UNDEFINED,
@@ -33,10 +33,9 @@ void Screen::init(void) {
 void Screen::updata(uint32_t *buffer) {
 	uint32_t pitch;
 	void *pixels = NULL;
-	if (SDL_LockTexture(this->texture, NULL, (void**)&pixels, (int*)&pitch) == 0) {
-		memcpy(pixels, buffer, pitch * this->height);
-		SDL_UnlockTexture(this->texture);
-	}
+	SDL_LockTexture(this->texture, NULL, (void**)&pixels, (int*)&pitch);
+	memcpy(pixels, buffer, pitch * this->height);
+	SDL_UnlockTexture(this->texture);
 }
 
 void Screen::clear(void) {

@@ -19,8 +19,6 @@ union CartridgeFlag1 {
 		bool sram : 1;
 		bool trainer : 1;
 		bool fourScreen : 1;
-		uint8_t consoleType : 2;
-		uint8_t version : 2;
 		uint8_t lmapper : 4;
 	};
 };

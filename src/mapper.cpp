@@ -19,6 +19,6 @@ void Mapper::mapper0(void) {
 	assert(0 < prgromCount && prgromCount <= 2,
 		format("Mapper: mapper0 bad PRG-ROM count(%d)!", prgromCount)
 	);
-	this->bus.ppu.memory.map(0, 0x2000, this->bus.cartridge.chrrom, CHRROMSIZE * 1);
-	this->bus.cpu.memory.map(0x8000, 0x10000, this->bus.cartridge.prgrom, PRGROMSIZE * prgromCount);
+	this->bus.ppu.memory.map(0, 0x2000, this->bus.cartridge.chrrom, CHRROMSIZE * 1, true, false);
+	this->bus.cpu.memory.map(0x8000, 0x10000, this->bus.cartridge.prgrom, PRGROMSIZE * prgromCount, true, false);
 }

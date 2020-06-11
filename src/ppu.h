@@ -71,10 +71,10 @@ public:
     uint8_t oamaddr; // OAM address ($2003) > write
     uint8_t scroll; // Scroll ($2005) >> write x2
     uint16_t vaddr; // Address ($2006) >> write x2
-    uint8_t spindexes[32] = {0}; // µ÷É«°åË÷Òı
-    uint8_t oam[256] = {0}; // ¾«ÁéÊı¾İ, ÓĞ64¸ö4 byte ¾«Áé
-	Palette palette[64] = {0}; // µ÷É«°å
-    uint32_t *buffer; // ÏÔÊ¾»º´æ
+    uint8_t spindexes[32] = {0}; // è°ƒè‰²æ¿ç´¢å¼•
+    uint8_t oam[256] = {0}; // ç²¾çµæ•°æ®, æœ‰64ä¸ª4 byte ç²¾çµ
+	Palette palette[64] = {0}; // è°ƒè‰²æ¿
+    uint32_t *buffer; // æ˜¾ç¤ºç¼“å­˜
     uint32_t *buf;
 
     Memory memory;

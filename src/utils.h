@@ -12,7 +12,9 @@ void _print(T arg) {
 template<class... Args>
 void log(Args... args) {
 	int arr[] = { (_print(args), 0)... };
-	std::cout << std::endl;
+	if (sizeof(arr) != 0) {
+		std::cout << std::endl;
+	}
 }
 
 template<class... Args>
@@ -28,7 +30,7 @@ std::string format(const char* format_, Args... args) {
 
 #define error(info, ...) \
 do{ \
-	printf("%s:%s:%d ", __FILE__, __func__, __LINE__); \
+	printf("%s:%s:%d: ", __FILE__, __func__, __LINE__); \
     log(info, ##__VA_ARGS__); \
     exit(1); \
 }while(0)
@@ -36,7 +38,7 @@ do{ \
 #define assert(condition, ...) \
 do{ \
     if (!(condition)) { \
-		printf("%s:%s:%d", __FILE__, __func__, __LINE__); \
+		printf("%s:%s:%d: assert", __FILE__, __func__, __LINE__); \
         log("", ##__VA_ARGS__); \
         exit(1); \
     } \
