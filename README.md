@@ -4,7 +4,7 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 
 ![](balloon.gif) ![](mario.gif) ![](F-1-Race.gif) 
 
-# INFO
+# Info
 
 - 目前仅支持Mapper000，但并不保证其所有游戏能玩
 - 支持自适应窗口
@@ -18,14 +18,24 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 
 # Make
 
-- Windowns: 本项目使用`vs2017`，用`Release x86`生成解决方案，然后将library/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
+- Windowns: 
+
+  - vs2017：用`Release x86`生成解决方案，然后将lib/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
+
+  - mingw64：
+
+    ```
+    cd ppfc
+    g++ -o ppfc.exe src/*.cpp -std=c++11 -O1 "-Ilib\x86_64-w64-mingw32\include\SDL2" "-Llib\x86_64-w64-mingw32\lib" -lSDL2 -lSDL2main
+    ```
+    然后将lib/x86_64-w64-mingw32/bin/SDL2.dll 复制到ppfc.exe 所在目录
+    
 
 - Linux: 需要另外安装SDL2
 
   ```
-  git clone https://github.com/hui0808/ppfc.git
   cd ppfc
-  g++ -o ppfc src/*.cpp -std=c++11 -lpthread $(sdl2-config --cflags --libs)
+  g++ -o ppfc src/*.cpp -std=c++11 -O1 -lpthread $(sdl2-config --cflags --libs)
   ```
 
 # Usage

@@ -71,13 +71,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)out\</OutDir>
-    <IncludePath>.\library\SDL2-2.0.12\include;$(IncludePath)</IncludePath>
-    <LibraryPath>.\library\SDL2-2.0.12\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\lib\SDL2-2.0.12\include;$(IncludePath)</IncludePath>
+    <LibraryPath>.\lib\SDL2-2.0.12\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
-    <IncludePath>.\library\SDL2-2.0.12\include;$(IncludePath)</IncludePath>
-    <LibraryPath>.\library\SDL2-2.0.12\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\lib\SDL2-2.0.12\include;$(IncludePath)</IncludePath>
+    <LibraryPath>.\lib\SDL2-2.0.12\lib\x86;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)out\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

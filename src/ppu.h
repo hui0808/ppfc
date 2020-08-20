@@ -73,7 +73,7 @@ public:
     uint16_t vaddr; // Address ($2006) >> write x2
     uint8_t spindexes[32] = {0}; // 调色板索引
     uint8_t oam[256] = {0}; // 精灵数据, 有64个4 byte 精灵
-	Palette palette[64] = {0}; // 调色板
+    Palette palette[64] = {0}; // 调色板
     uint32_t *buffer; // 显示缓存
     uint32_t *buf;
 
@@ -109,7 +109,7 @@ public:
     void init(void);
     void memoryInit();
     void run(void);
-	void render(void);
+    void render(void);
     void renderBackground(void);
     void renderSprite(void);
     void spriteEvaluate(void);
@@ -117,12 +117,12 @@ public:
     void vaddrInc(void);
     void xInc(void);
     void yInc(void);
-	void frameRateLimit(void);
+    void frameRateLimit(void);
     uint8_t regRead(uint32_t addr);
     void regWrite(uint32_t addr, uint8_t byte);
     void dma(uint32_t addr, uint8_t byte);
     uint16_t getDmaAddr(uint8_t data);
-	void colorEmphasis(uint8_t flag);
+    void colorEmphasis(uint8_t flag);
 };
 
 extern const Palette gpalette[64];

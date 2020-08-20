@@ -7,12 +7,12 @@ class PPFC;
 
 class Mapper {
 public:
-	PPFC& bus;
-	uint8_t mapper;
+    PPFC& bus;
+    uint8_t mapper;
 
-	Mapper(PPFC& bus);
-	void init(void);
-	void mapper0(void);
+    Mapper(PPFC& bus);
+    void init(void);
+    void mapper0(void);
 
 };
 
