@@ -1,17 +1,11 @@
 #include "cartridge.h"
-#include "utils.h"
-#include <string>
-#include <stdio.h>
 
 Cartridge::Cartridge(const char* path) {
     this->path = path;
     this->file = fopen(path, "rb");
     assert(this->file != nullptr, "Cartridge: load nes file error!");
     this->loadHeader();
-    if (this->flag1.trainer) { // 暂时跳过金手指
-        fseek(this->file, 512, SEEK_CUR);
-    }
-    this->loadFlags();
+    this->loadTrainer();
     this->loadRom();
     assert(fgetc(this->file) == EOF, "Cartridge: failed to read end of file!");
     fclose(this->file);
@@ -28,12 +22,19 @@ void Cartridge::loadHeader(void) {
         const char* id = "NES\x1a";
         assert(this->header.id == *((uint32_t*)id), "Cartridge: error nes file header!");
     }
+    this->loadFlags();
 }
 
 void Cartridge::loadFlags(void) {
     this->flag1.flag = this->header.flag1;
     this->flag2.flag = this->header.flag2;
     this->mapper = flag1.lmapper || (flag2.hmapper >> 4);
+}
+
+void Cartridge::loadTrainer(void) {
+    if (this->flag1.trainer) { // 暂时跳过金手指
+        fseek(this->file, 512, SEEK_CUR);
+    }
 }
 
 void Cartridge::loadRom(void) {

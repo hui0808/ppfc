@@ -1,3 +1,6 @@
 *.vs
 Release
 Debug
+.idea
+cmake-build-debug
+
