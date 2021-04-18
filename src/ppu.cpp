@@ -33,7 +33,7 @@ void PPU::reset(void) {
     this->odd = 0;
     this->cycle = 0;
     this->frameClock = NTSC_CYCLES * 242;
-    this->scanline = 0;
+    this->scanline = 242;
     this->bgPatAddr = this->ctrl.bakTalAddr ? 0x1000 : 0;
     this->spPatAddr = this->ctrl.sprTalAddr ? 0x1000 : 0;
 }
@@ -65,47 +65,55 @@ void PPU::memoryInit() {
 }
 
 void PPU::run(void) {
-    if (this->frameClock < NTSC_CYCLES * NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
-        if (this->cycle < 256) { // cycle 0~255 visible scanlines render
-            this->render();
-        } else if (this->cycle == 320) { // sprite evaluation
-            if (this->mask.background || this->mask.sprite) {
-                this->spriteEvaluate();
-                this->vaddr &= ~0x041F;
-                this->vaddr |= (this->tmpvaddr & 0x041F);
-                this->finex = this->tmpfinex;
-                this->yInc();
+    switch (this->scanline) {
+        case 0 ... 239: // Visible scanlines
+            switch (this->cycle) {
+                case 0: break; // idle cycle, 在第一行扫描行, 如果是奇数帧将跳过
+                case 1 ... 256: this->render(); break;
+                case 257 ... 319: break;  // spriteEvaluate
+                case 320:
+                    if (this->mask.background || this->mask.sprite) {
+                        this->spriteEvaluate();
+                        this->vaddr &= ~0x041F;
+                        this->vaddr |= (this->tmpvaddr & 0x041F);
+                        this->finex = this->tmpfinex;
+                        this->yInc();
+                    }
+                    break;
+            } break;
+        case 240: break; // Post-render scanline, The PPU just idles during this scanline.
+        case 241:  // Vertical blanking lines
+            switch (this->cycle) {
+                case 1:  // The VBlank flag of the PPU is set at tick 1
+                    this->preVblank = this->status.vblank;
+                    this->status.vblank = 1;
+                    this->buffer = this->buf; // reset to (0, 0)
+                    break;
             }
-        }
-    } else if (this->frameClock == NTSC_CYCLES * NTSC_VBLANK + 0) { // set vblank flag 241
-        this->preVblank = this->status.vblank;
-        this->status.vblank = 1;
-        this->buffer = this->buf; // reset to (0, 0)
-    } else if (this->frameClock == NTSC_CYCLES * NTSC_PRERENDER_LINE + 0) { // pre-render line 261 cycle 1 clear vblank
-        this->preVblank = this->status.vblank;
-        this->status.vblank = 0;
-        this->status.spr0Hit = 0;
-        this->status.sprOver = 0;
-        if (this->mask.background || this->mask.sprite) {
-            this->vaddr = this->tmpvaddr;
-            this->finex = this->tmpfinex;
-        }
-    } else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 2) {
-        if (this->odd && (this->mask.background || this->mask.sprite)) {
-            this->frameClock = 0;
-            this->cycle = 0;
-            this->scanline = 0;
-            this->odd = 0;
-            return;
-        }
-    } else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 1) {
-        this->frameClock = 0;
-        this->cycle = 0;
-        this->scanline = 0;
-        if (this->mask.background || this->mask.sprite) {
-            this->odd = 1;
-        }
-        return;
+            break;
+        case 242 ... 260: break;  // Vertical blanking lines
+        case 261:  // Pre-render scanline
+            switch (this->cycle) {
+                case 1:  // clear VBlank, sprite 0 and overflow
+                    this->preVblank = this->status.vblank;
+                    this->status.vblank = 0;
+                    this->status.spr0Hit = 0;
+                    this->status.sprOver = 0;
+                    if (this->mask.background || this->mask.sprite) {
+                        this->vaddr = this->tmpvaddr;
+                        this->finex = this->tmpfinex;
+                    }
+                    break;
+                case 239:  // 翻转奇偶flag，
+                    this->odd ^= 1;
+                    if (this->odd && (this->mask.background || this->mask.sprite)) {
+                        this->frameClock = 0;
+                        this->cycle = 0;
+                        this->scanline = 0;
+                    }
+                    break;
+            }
+            break;
     }
     this->frameRateLimit();
     this->frameClock++;
@@ -113,6 +121,10 @@ void PPU::run(void) {
     if (this->cycle == NTSC_CYCLES) {
         this->cycle = 0;
         this->scanline++;
+    }
+    if (this->scanline == NTSC_SCANLINE) {
+        this->frameClock = 0;
+        this->scanline = 0;
     }
 }
 
@@ -176,9 +188,10 @@ void PPU::render(void) {
     // Visible scanlines render
     this->pixel = 0;
     if (this->mask.background || this->mask.sprite) {
-        if (this->cycle == 0) {
+        if (this->cycle == 1) { // 预读取
             this->titeDatal = 0;
             this->titeDatah = 0;
+            this->attrData = 0;
 
             this->fetchTile();
             this->vaddrInc();
@@ -211,6 +224,7 @@ void PPU::render(void) {
 
 void PPU::renderBackground(void) {
     if (this->mask.back8 || this->cycle >= 8) {
+        // 组成pixel4位中的低2位
         this->pixel = (this->titeDatah << 8 >> 31 << 1) | (this->titeDatal << 8 >> 31);
         if (this->pixel)
             this->pixel |= (this->attrData & 0x0F);
@@ -318,19 +332,31 @@ void PPU::spriteEvaluate(void) {
 }
 
 void PPU::fetchTile(void) {
+    // vaddr: xxxx aabb bbbb bbbb
+    // a(D10-D11): 4个名称表的索引下标
+    // b(D0-D9): 某一名称表里的偏移，每个名称表共有1024个偏移，每个偏移指向着图样表中某个图块的索引
     uint8_t finey = this->vaddr >> 12;
-    uint16_t ntalAddr = (this->vaddr & 0x0FFF) + 0x2000;
-    uint16_t attrAddr = (this->vaddr & 0x0C00) + 0x23C0 + ((this->vaddr >> 4) & 0x38) + ((this->vaddr >> 2) & 0x07);
+//    printf("finey: %d\n", finey);
+    uint16_t nameTableOffsetAddr = (this->vaddr & 0x0FFF) + 0x2000;
+    // 获取图块在属性表中的偏移地址
+    uint16_t attrTableOffsetAddr = (this->vaddr & 0x0C00) + 0x23C0 + ((this->vaddr >> 4) & 0x38) + ((this->vaddr >> 2) & 0x07);
 
-    uint8_t ntalData = this->memory.read(ntalAddr);
-    uint8_t attrData = this->memory.read(attrAddr);
+    uint8_t nameTableData = this->memory.read(nameTableOffsetAddr);
+    uint8_t attrTableData = this->memory.read(attrTableOffsetAddr);
 
-    this->titeDatal |= this->memory.read(this->bgPatAddr + ntalData * 16 + finey);
-    this->titeDatah |= this->memory.read(this->bgPatAddr + ntalData * 16 + finey + 8);
+    // 图样表
+    this->titeDatal |= this->memory.read(this->bgPatAddr + nameTableData * 16 + finey);
+    this->titeDatah |= this->memory.read(this->bgPatAddr + nameTableData * 16 + finey + 8);
 
-    uint8_t ashift = ((this->vaddr & (1 << 6)) >> 4) | ((this->vaddr & (1 << 1)));
+    uint8_t ashift = ((this->vaddr & (1 << 6)) >> 4) | ((this->vaddr & (1 << 1))); // 计算图块在属性表中的偏移
     this->attrData >>= 4;
-    this->attrData |= ((attrData >> ashift) & 0x03) << 10;
+    this->attrData |= ((attrTableData >> ashift) & 0x03) << 10;
+    // attrData 变化
+    // FEDC BA98 7654 3210
+    // 0000 0000 0000 0000
+    // 0000 1100 0000 0000 - 1st
+    // 0000 1100 1100 0000 - 2th
+    // 0000 1100 1100 1100 - 3rd
 }
 
 void PPU::vaddrInc(void) {
@@ -343,6 +369,7 @@ void PPU::vaddrInc(void) {
 }
 
 void PPU::xInc(void) {
+    // finex 是一个8*8像素图块中列的偏移
     if (this->finex == 0x07) {
         this->finex = 0;
         this->fetchTile();
@@ -399,7 +426,7 @@ uint8_t PPU::regRead(uint32_t addr) {
         case(2): // $2002 PPU状态寄存器
         {
             uint8_t data = this->status.status;
-            this->status.vblank = 0;
+            this->status.vblank = 0; // 每次读取都会清除vblank flag
             if (this->frameClock == NTSC_CYCLES * NTSC_VBLANK + 2
                 || this->frameClock == NTSC_CYCLES * NTSC_PRERENDER_LINE + 2) {
                 data &= ~(1 << 7);
@@ -448,8 +475,8 @@ void PPU::regWrite(uint32_t addr, uint8_t byte) {
             this->ctrl.ctrl = byte;
             this->bgPatAddr = this->ctrl.bakTalAddr ? 0x1000 : 0;
             this->spPatAddr = this->ctrl.sprTalAddr ? 0x1000 : 0;
-            this->tmpvaddr &= ~(0x03 << 10); // TODO
-            this->tmpvaddr |= (byte & 0x03) << 10;
+            this->tmpvaddr &= ~(0x03 << 10); // 清除vaddr中的名称表序号信息
+            this->tmpvaddr |= (byte & 0x03) << 10; // 设置vaddr中的名称表序号信息
             break;
         case(1): // $2001 PPU掩码寄存器
             if ((this->mask.mask & 0xE1) != (byte & 0xE1)) {
