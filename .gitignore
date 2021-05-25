@@ -4,3 +4,6 @@ Debug
 .idea
 cmake-build-debug
 cmake-build-release
+*.nes
+*.exe
+*.dll

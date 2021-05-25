@@ -8,7 +8,7 @@ using WriteCallBack = std::function<void(uint32_t, uint8_t)>;
 
 #define CHECKADDR(a) assert(0 <= (a) && (a) < this->size, format("Memory: address(%0#6x) out of [0, %0#6x)", (addr), this->size))
 
-struct Blank {
+struct Bank {
     uint8_t *data;
     uint32_t size;
     uint32_t start;
@@ -22,7 +22,7 @@ struct Blank {
 class Memory {
 public:
     uint32_t size;
-    std::vector<Blank*>table;
+    std::vector<Bank*>table;
 
     Memory(uint32_t size);
     ~Memory();
@@ -37,8 +37,8 @@ public:
     void writew(uint32_t addr, uint16_t byte);
 
 private:
-    void add(Blank *item);
-    Blank* findBlank(uint32_t& addr);
+    void add(Bank *item);
+    Bank* findBank(uint32_t& addr);
 };
 
 inline uint16_t Memory::readw(uint32_t addr) {

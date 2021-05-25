@@ -15,7 +15,7 @@ public:
     // A, B, Select, Start, Up, Down, Left, Right
     uint32_t map[16] = {
         'j', 'k', 'u', 'i', 'w', 's', 'a', 'd', // player1
-        SDLK_KP_2, SDLK_KP_3, SDLK_KP_4, SDLK_KP_5, SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, // player2
+        SDLK_KP_1, SDLK_KP_2, SDLK_KP_4, SDLK_KP_5, SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, // player2
     };
 
     Keyboard(PPFC& bus);

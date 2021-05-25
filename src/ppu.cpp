@@ -128,62 +128,6 @@ void PPU::run(void) {
     }
 }
 
-//void PPU::run(void) {
-//    if (this->scanline < NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
-//        if (this->cycle < 256) { // cycle 0~255 visible scanlines render
-//            this->render();
-//        } else if (this->cycle == 320) { // sprite evaluation
-//            if (this->mask.background || this->mask.sprite) {
-//                this->spriteEvaluate();
-//                this->vaddr &= ~0x041F;
-//                this->vaddr |= (this->tmpvaddr & 0x041F);
-//                this->finex = this->tmpfinex;
-//                this->yInc();
-//            }
-//        }
-//    } else if (this->scanline == NTSC_VBLANK) { // set vblank flag 241
-//        if (this->cycle == 0) {
-//            this->preVblank = this->status.vblank;
-//            this->status.vblank = 1;
-//            this->buffer = this->buf; // reset to (0, 0)
-//        }
-//    } else if (this->scanline == NTSC_PRERENDER_LINE) { // pre-render line 261
-//        if (this->cycle == 0) { // cycle 1 clear vblank
-//            this->preVblank = this->status.vblank;
-//            this->status.vblank = 0;
-//            this->status.spr0Hit = 0;
-//            this->status.sprOver = 0;
-//            if (this->mask.background || this->mask.sprite) {
-//                this->vaddr = this->tmpvaddr;
-//                this->finex = this->tmpfinex;
-//            }
-//        } else if (this->cycle == NTSC_CYCLES - 2) {
-//            if (this->odd && (this->mask.background || this->mask.sprite)) {
-//                this->frameClock = 0;
-//                this->cycle = 0;
-//                this->scanline = 0;
-//                this->odd = 0;
-//                return;
-//            }
-//        } else if (this->cycle == NTSC_CYCLES - 1) {
-//            this->frameClock = 0;
-//            this->cycle = 0;
-//            this->scanline = 0;
-//            if (this->mask.background || this->mask.sprite) {
-//                this->odd = 1;
-//            }
-//            return;
-//        }
-//    }
-//    this->frameRateLimit();
-//    this->frameClock++;
-//    this->cycle++;
-//    if (this->cycle == NTSC_CYCLES) {
-//        this->cycle = 0;
-//        this->scanline++;
-//    }
-//}
-
 void PPU::render(void) {
     // Visible scanlines render
     this->pixel = 0;
@@ -237,26 +181,37 @@ void PPU::renderSprite(void) {
     uint8_t p;
     uint8_t res = this->pixel;
     uint8_t *sprite = this->secOam + this->sprNum * 4;
+    // sprite
+    // 0 sprite title 低字节
+    // 1 sprite title 高字节
+    // 2 hpyy xxxx : h为水平翻转，p为优先级，y为pixel高2位
+    // 3 精灵X坐标
 
     while (sprite > this->secOam) {
         sprite -= 4;
+        // 判断当前ppu cycle是否适合渲染精灵
         if (sprite[3] == this->cycle && !(sprite[2] & (1 << 3))) {
-            if (sprite[2] & (1 << 7)) { // Flip sprite vertically
+            if (sprite[2] & (1 << 7)) { // 水平翻转
+                // 组装精灵pixel低2位
                 p = (sprite[0] & 0x01) | ((sprite[1] & 0x01) << 1);
                 sprite[0] >>= 1;
                 sprite[1] >>= 1;
             } else {
+                // 组装精灵pixel低2位
                 p = (sprite[0] >> 7) | (sprite[1] >> 7 << 1);
                 sprite[0] <<= 1;
                 sprite[1] <<= 1;
             }
+            // mask.sprite8判断前8个ppu cycle不画精灵
             if (!(this->mask.sprite8) && this->cycle < 8) {
                 p = 0;
             }
             if (p != 0) {
+                // 如果精灵在背景前，且pixel有值，则保持不变0
                 if (sprite[2] & (1 << 6) && (this->pixel & 0x03)) {
                     res = this->pixel;
                 } else {
+                    // 调色板索引保存着32种颜色保存地址，前16个为背景所用，后16个为精灵所用
                     res = (p | ((sprite[2] >> 2) & 0x0C)) + 16;
                 }
 
@@ -270,8 +225,8 @@ void PPU::renderSprite(void) {
                     this->status.spr0Hit = 1;
                 }
             }
-            sprite[2]++;
-            sprite[3]++;
+            sprite[2]++; // 精灵渲染次数记录++
+            sprite[3]++; // x坐标++
         }
     }
     this->pixel = res;
@@ -293,20 +248,23 @@ void PPU::spriteEvaluate(void) {
 
     this->sprNum = 0;
     this->sprZero = nullptr;
-    if (this->scanline >= oam->y && this->scanline < oam->y + high)
+    // 精灵#0即为下一scanline即将要渲染的第一个精灵
+    if (this->scanline >= oam->y && this->scanline < oam->y + high) {
         this->sprZero = secOam;
+    }
 
     do {
         if (this->scanline >= oam->y && this->scanline < oam->y + high) {
             tile = oam->tileIndex;
-            y = this->scanline - oam->y; // y
-            if (oam->attr & (1 << 7))
+            y = this->scanline - oam->y; // dy
+            if (oam->attr & (1 << 7)) // 处理垂直翻转
                 y = high - y - 1; // vflip
             switch (high) {
                 case 8:
                     patAddr = this->spPatAddr;
                     break;
                 case 16:
+                    // 图样表地址，奇数则为$1000，偶数为0
                     patAddr = (oam->tileIndex & 0x01) ? 0x1000 : 0;
                     if (y < 8) {
                         tile &= ~(1 << 0);

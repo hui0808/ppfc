@@ -39,14 +39,18 @@ void Keyboard::keyup(SDL_Event& event) {
 }
 
 uint8_t Keyboard::port16Read(uint32_t addr) {
-    return this->status[this->player1++ & this->mask];
+    // 0x40是 open bus 值 https://wiki.nesdev.com/w/index.php/Standard_controller
+    return this->status[this->player1++ & this->mask] | 0x40;
 }
 
 void Keyboard::port16Write(uint32_t addr, uint8_t byte) {
+    // $4016写入1，mask为0b0000，此时读取永远只能读取到第一个键 A 的值
+    // $4016写入0，mask为0b0111，此时正常读取8个按键
     this->mask = byte & 0x01 ? 0 : 0x07;
-    if (byte & 0x01) this->player1 = this->player2 = 0;
+    // 清空偏移
+    this->player1 = this->player2 = 0;
 }
 
 uint8_t Keyboard::port17Read(uint32_t addr) {
-    return this->status[8 + (this->player2++ & this->mask)];
+    return this->status[8 + (this->player2++ & this->mask)] | 0x40;
 }

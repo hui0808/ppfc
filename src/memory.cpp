@@ -18,7 +18,7 @@ void Memory::map(uint32_t start, uint32_t end, uint8_t *data,
     if ((end - start) % size != 0) {
         error(format("Memory: the range of (end - start) must be an integer multiple of %ld", this->size));
     }
-    Blank *item = new Blank{ data, size, start, end, nullptr, nullptr, readable, writeable };
+    Bank *item = new Bank{data, size, start, end, nullptr, nullptr, readable, writeable };
     this->add(item);
 }
 
@@ -30,20 +30,20 @@ void Memory::map(uint32_t start, uint32_t end, ReadCallBack rCallBack, WriteCall
     if ((end - start) % size != 0) {
         error(format("Memory: the range of (end - start) must be an integer multiple of %ld", this->size));
     }
-    Blank *item = new Blank{ nullptr, size, start, end, rCallBack, wCallBack, readable, writeable };
+    Bank *item = new Bank{nullptr, size, start, end, rCallBack, wCallBack, readable, writeable };
     this->add(item);
 }
 
 uint8_t Memory::read(uint32_t addr) {
     CHECKADDR(addr);
     uint32_t a = addr;
-    Blank* blank = this->findBlank(addr);
-    if (blank != nullptr) {
-        if (blank->readable) {
-            if (blank->data) {
-                return blank->data[addr];
+    Bank* bank = this->findBank(addr);
+    if (bank != nullptr) {
+        if (bank->readable) {
+            if (bank->data) {
+                return bank->data[addr];
             } else {
-                return blank->rCallBack(addr);
+                return bank->rCallBack(addr);
             }
         }
         error(format("Memory: address(%0#6x) cannot be read!", a));
@@ -56,14 +56,14 @@ uint8_t Memory::read(uint32_t addr) {
 void Memory::write(uint32_t addr, uint8_t byte) {
     CHECKADDR(addr);
     uint32_t a = addr;
-    Blank* blank = this->findBlank(addr);
-    if (blank != nullptr) {
-        if (blank->writeable) {
-            if (blank->data) {
-                blank->data[addr] = byte;
+    Bank* bank = this->findBank(addr);
+    if (bank != nullptr) {
+        if (bank->writeable) {
+            if (bank->data) {
+                bank->data[addr] = byte;
                 return;
             } else {
-                blank->wCallBack(addr, byte);
+                bank->wCallBack(addr, byte);
                 return;
             }
         }
@@ -73,9 +73,9 @@ void Memory::write(uint32_t addr, uint8_t byte) {
     //exit(0);
 }
 
-void Memory::add(Blank *item) {
+void Memory::add(Bank *item) {
     for (auto i = this->table.begin(); i != this->table.end(); i++) {
-        Blank *j = *i;
+        Bank *j = *i;
         if ((j->start <= item->start && item->end <= j->end)
             || (j->start <= item->start && item->start < j->end)
             || (j->start < item->end && item->end <= j->end)) {
@@ -89,7 +89,7 @@ void Memory::add(Blank *item) {
     this->table.push_back(item);
 }
 
-Blank* Memory::findBlank(uint32_t& addr) {
+Bank* Memory::findBank(uint32_t& addr) {
     for (auto i : this->table) {
         if (i->start <= addr && addr < i->end) {
             addr = (addr - i->start) % i->size;

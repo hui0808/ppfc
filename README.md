@@ -66,10 +66,10 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 |  Down  |    ↓     |
 |  Left  |    ←     |
 | Right  |    →     |
-|   A    | Keypad 2 |
-|   B    | Keypad 3 |
-| Select | Keypad 5 |
-| Start  | Keypad 6 |
+|   A    | Keypad 1 |
+|   B    | Keypad 2 |
+| Select | Keypad 4 |
+| Start  | Keypad 5 |
 
 **Other**
 

@@ -3,7 +3,7 @@ project(ppfc)
 
 set(CMAKE_CXX_STANDARD 14)
 #add_compile_options(-O1)
-add_compile_options(-g)
+#add_compile_options(-g)
 
 # 指定库的路径，必须先于target生成之前指定
 link_directories(lib/x86_64-w64-mingw32/lib)
