@@ -3,4 +3,5 @@ Release
 Debug
 .idea
 cmake-build-debug
-
+**/*.o
+.vscode

@@ -22,28 +22,16 @@ void PPFC::run(void) {
     this->init();
     this->beforeRun();
     this->status = PPFC_RUN;
-
-    std::thread t([this]() {
-        while (this->status != PPFC_STOP) {
-            this->screen.updata(this->ppu.buf);
-            this->screen.render();
-        }
-    });
-
+    int counter = 0;
     while (this->status != PPFC_STOP) {
         switch (this->status) {
         case(PPFC_RUN):
             do {
+                // each cpu run, ppu run 3 times
+                if (counter == 0) this->cpu.run();
                 this->ppu.run();
-                this->ppu.run();
-                this->ppu.run();
-                this->cpu.run();
-                this->ppu.run();
-                this->ppu.run();
-                this->ppu.run();
-                this->cpu.run();
-            } while (!(this->ppu.frameClock >= NTSC_CYCLES * 241 + 1 
-                && this->ppu.frameClock <= NTSC_CYCLES * 241 + 6));
+                counter = (counter + 1) % PPU_CPU_CLOCK_RATIO;
+            } while (this->ppu.frameClock != NTSC_CYCLES * 241 + 1);
             break;
         case(PPFC_RESET):
             this->ppu.reset();
@@ -51,9 +39,10 @@ void PPFC::run(void) {
             this->status = PPFC_RUN;
             break;
         }
+        this->screen.updata(this->ppu.buf);
+        this->screen.render();
         this->handleEvent();
     }
-    t.join();
     this->quit();
 }
 
@@ -87,6 +76,7 @@ void PPFC::registerFunc(uint16_t eventType, EventCallBack callback) {
 }
 
 void PPFC::quit(void) {
+    printf("PPFC: quit\n");
     this->screen.quit();
     SDL_Quit();
 }

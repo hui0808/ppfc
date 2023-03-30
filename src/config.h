@@ -12,4 +12,6 @@
 #define NTSC_VBLANK           241
 #define NTSC_PRERENDER_LINE   261
 #define NTSC_FRAME_RATE       60
+#define PPU_CPU_CLOCK_RATIO   3    // 3 PPU cycles per CPU cycle
+
 #endif // __PPFC_CLOCK_H__
