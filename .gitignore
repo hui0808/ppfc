@@ -5,3 +5,5 @@ Debug
 cmake-build-debug
 **/*.o
 .vscode
+build
+

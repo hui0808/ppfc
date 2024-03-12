@@ -1,20 +1,27 @@
 # Makefile for PPFC project
-# Using SDL2 library
 
 # Compiler
 CC = g++
 
 # Compiler flags
-CFLAGS = -std=c++11 -Wall -O1 -g
+CFLAGS = -std=c++11 -Wall -O2
 
 # Include directories
-IDIR = -Ilib/x86_64-w64-mingw32/include/SDL2
+ifeq ($(OS),Windows_NT)
+	IDIR = -Ilib/x86_64-w64-mingw32/include/SDL2
+else
+	IDIR = -I/usr/local/include
+endif
 
 # Library directories
-LDIR = -Llib/x86_64-w64-mingw32/lib
+ifeq ($(OS),Windows_NT)
+	LDIR = -Llib/x86_64-w64-mingw32/lib
+else
+	LDIR = -L/usr/local/lib
+endif
 
 # Libraries to link
-LIBS = -lSDL2main -lSDL2
+LIBS = -lSDL2
 
 # Source files
 SRCS = src/cartridge.cpp \
@@ -31,7 +38,11 @@ SRCS = src/cartridge.cpp \
 OBJS = $(SRCS:.cpp=.o)
 
 # Target
-TARGET = ppfc.exe
+ifeq ($(OS),Windows_NT)
+	TARGET = ppfc.exe
+else
+	TARGET = ppfc
+endif
 
 # Build rules
 all: $(TARGET)
