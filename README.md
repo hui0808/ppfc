@@ -8,40 +8,33 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 
 - 目前仅支持Mapper000，但并不保证其所有游戏能玩
 - 支持自适应窗口
-- 支持Linux平台，不过仅在Ubuntu18上测试过
+- 支持 Linux 平台，不过仅在Ubuntu18上测试过
+- 支持 mac 平台
 
 # Environment
 
 - SDL2-2.0.12
-- vs2017
-- Windowns 10
 
 # Make
 
 - Windowns: 
 
-  - vs2017：用`Release x86`生成解决方案，然后将lib/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
-
+  - vs2017：
+    - 用`Release x86`生成解决方案，然后将lib/SDL2-2.0.12/lib/x86/SDL2.dll 复制到ppfc.exe 所在目录
+    - 现已不维护
   - mingw64：
-
-    ```
-    cd ppfc
-    g++ -o ppfc.exe src/*.cpp -std=c++11 -O1 "-Ilib\x86_64-w64-mingw32\include\SDL2" "-Llib\x86_64-w64-mingw32\lib" -lSDL2 -lSDL2main
-    ```
-    然后将lib/x86_64-w64-mingw32/bin/SDL2.dll 复制到ppfc.exe 所在目录
-    
+    - makefile 文件已经支持编译
 
 - Linux: 需要另外安装SDL2
-
-  ```
-  cd ppfc
-  g++ -o ppfc src/*.cpp -std=c++11 -O1 -lpthread $(sdl2-config --cflags --libs)
-  ```
+    - makefile 文件已经支持编译
+  
+- Mac: 需要另外安装SDL2
+  - makefile 文件已经支持编译
 
 # Usage
 
-- ppfc.exe \<nes rom path\>
-- 用鼠标将ROM拖曳到ppfc.exe
+- <output 文件> \<nes rom path\>
+- 用鼠标将 ROM 拖曳到 output 文件
 
 # Controller
 

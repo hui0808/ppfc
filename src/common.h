@@ -19,7 +19,7 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(WIN64) || defined(_WIN64) || defined(_WIN64_)
 #include "SDL.h" // Windows
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__MACOSX) || defined(__MACOS_CLASSIC__) || defined(__APPLE__) || defined(__apple__)
 #include <SDL2/SDL.h> // Linux
 #endif
 
