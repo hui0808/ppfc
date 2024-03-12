@@ -8,6 +8,7 @@
 #include "mapper.h"
 #include "screen.h"
 #include "keyboard.h"
+#include "apu.h"
 #include "plugin_save_load.h"
 
 using EventCallBack = std::function<void(SDL_Event&)>;
@@ -26,6 +27,7 @@ public:
     Cartridge cartridge;
     CPU cpu;
     PPU ppu;
+    APU apu;
     Mapper mapper;
     Screen screen;
     Keyboard keyboard;

@@ -1,14 +1,14 @@
 #include "ppfc.h"
 
-PPFC::PPFC(const char* path) :
-        cartridge(path),
-        cpu(*this),
-        ppu(*this),
-        mapper(*this),
-        screen(*this, "PPFC", 256, 240),
-        keyboard(*this),
-        pluginSaveLoad(*this){
-
+PPFC::PPFC(const char* path):
+    cartridge(path),
+    cpu(*this),
+    ppu(*this),
+    apu(*this),
+    mapper(*this),
+    screen(*this, "PPFC", 256, 240),
+    keyboard(*this),
+    pluginSaveLoad(*this){
     this->status = PPFC_STOP;
 }
 
@@ -33,9 +33,12 @@ void PPFC::run(void) {
         case(PPFC_RUN):
             do {
                 // each cpu run, ppu run 3 times
-                if (counter == 0) this->cpu.run();
+                if ((counter % PPU_CPU_CLOCK_RATIO) == 0) this->cpu.run();
+                // each apu run, cpu run 2 times, ppu run 6 times
+                if (counter == 0) this->apu.run();
+                this->apu.run();
                 this->ppu.run();
-                counter = (counter + 1) % PPU_CPU_CLOCK_RATIO;
+                counter = (counter + 1) % (PPU_CPU_CLOCK_RATIO * CPU_APU_CLOCK_RATIO);
             } while (this->ppu.frameClock != NTSC_CYCLES * 241 + 1);
             break;
         case(PPFC_RESET):
