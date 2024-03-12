@@ -31,9 +31,11 @@ void CPU::reset(void) {
 void CPU::memoryInit(void) {
     this->memory.map(0, 0x2000, this->ram, 2048); // Internal-RAM
     this->memory.map(0x2000, 0x4000, READBIND(this->bus.ppu.regRead), WRITEBIND(this->bus.ppu.regWrite), 8); // PPU-Registers
+    this->memory.map(0x4000, 0x4014, READBIND(this->bus.apu.regRead), WRITEBIND(this->bus.apu.regWrite), 20); // APU-Registers of $4000-$4013
     this->memory.map(0x4014, 0x4015, nullptr, WRITEBIND(this->bus.ppu.dma), 1, false); // PPU-OAM-DMA
+    this->memory.map(0x4015, 0x4016, READBIND(this->bus.apu.regRead), WRITEBIND(this->bus.apu.regWrite), 1); // APU-Registers of $4015
     this->memory.map(0x4016, 0x4017, READBIND(this->bus.keyboard.port16Read), WRITEBIND(this->bus.keyboard.port16Write), 1); // I/O-Registers1
-    this->memory.map(0x4017, 0x4018, READBIND(this->bus.keyboard.port17Read), [](uint32_t, uint8_t) {}, 1, true, true); // I/O-Registers2
+    this->memory.map(0x4017, 0x4018, READBIND(this->bus.keyboard.port17Read), WRITEBIND(this->bus.apu.regWrite), 1); // I/O-Registers2 and APU-Registers of $4017
     if (this->bus.cartridge.saveram) { // Save-RAM
         this->memory.map(0x6000, 0x8000, this->bus.cartridge.saveram, 8192);
     }

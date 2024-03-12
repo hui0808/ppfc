@@ -33,13 +33,17 @@ struct PULSEREG {
 };
 
 struct TRIANGLEREG {
+    // $4008
     struct {
         uint8_t linearCounterReloadValue : 7;
         uint8_t linearCounterControlFlag : 1; // also the length counter halt flag
     } reg0; // Linear counter setup
+    // $4009 unused
+    // $400A
     struct {
         uint8_t timerLow : 8;
     } reg1;
+    // $400B
     struct {
         uint8_t timerHigh : 3;
         uint8_t lengthCounterLoad : 5;
@@ -67,8 +71,23 @@ struct NOISEREG {
 };
 
 // TODO: DMC
+struct DMCREG {
+    struct {
+        uint8_t frequency : 4;
+        uint8_t unused : 2;
+        uint8_t loop : 1;
+        uint8_t irqEnable : 1;
+    } reg0;
+    struct {
+        uint8_t loadCounter : 7;
+        uint8_t unused : 1;
+    } reg1;
+    uint8_t sampleAddress; // reg2
+    uint8_t sampleLength; // reg3
+};
 
-union APUSTATUS {
+// $4015 status register for write
+union APU_WRITEABLE_STATUS {
     uint8_t status;
     struct {
         uint8_t pulse1Enable : 1;
@@ -76,15 +95,20 @@ union APUSTATUS {
         uint8_t triangleEnable : 1;
         uint8_t noiseEnable : 1;
         uint8_t dmcEnable : 1;
-        uint8_t unused1 : 3;
+        uint8_t unused : 3;
     };
+};
+
+// $4015 status register for read
+union APU_READABLE_STATUS {
+    uint8_t status;
     struct {
         uint8_t pulse1LengthCounterZero : 1;
         uint8_t pulse2LengthCounterZero : 1;
         uint8_t triangleLengthCounterZero : 1;
         uint8_t noiseLengthCounterZero : 1;
         uint8_t dmcActive : 1;
-        uint8_t unused2 : 1;
+        uint8_t unused : 1;
         uint8_t frameCounterInterrupt : 1;
         uint8_t dmcInterrupt : 1;
     };
@@ -106,7 +130,9 @@ public:
     PULSEREG pulseChannel2;
     TRIANGLEREG triangleChannel;
     NOISEREG noiseChannel;
-    APUSTATUS status;
+    DMCREG dmcChannel;
+    APU_WRITEABLE_STATUS writeableStatus;
+    APU_READABLE_STATUS readableStatus;
     APUFRAMECOUNTER frameCounter;
     uint32_t cycle;
     uint8_t dividerCount;

@@ -16,6 +16,7 @@ void PPFC::init(void) {
     this->mapper.init();
     this->cpu.init();
     this->ppu.init();
+    this->apu.init();
     this->screen.init();
     this->keyboard.init();
     this->pluginSaveLoad.init();
@@ -43,6 +44,7 @@ void PPFC::run(void) {
             break;
         case(PPFC_RESET):
             this->ppu.reset();
+            this->apu.reset();
             this->cpu.reset();
             this->status = PPFC_RUN;
             break;

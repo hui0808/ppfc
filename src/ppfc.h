@@ -5,10 +5,10 @@
 #include "cartridge.h"
 #include "cpu.h"
 #include "ppu.h"
+#include "apu.h"
 #include "mapper.h"
 #include "screen.h"
 #include "keyboard.h"
-#include "apu.h"
 #include "plugin_save_load.h"
 
 using EventCallBack = std::function<void(SDL_Event&)>;

@@ -107,7 +107,7 @@ public:
     ~PPU();
     void reset(void);
     void init(void);
-    void memoryInit();
+    void memoryInit(void);
     void run(void);
     void render(void);
     void renderBackground(void);

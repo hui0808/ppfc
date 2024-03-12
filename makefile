@@ -32,6 +32,7 @@ SRCS = src/cartridge.cpp \
        src/memory.cpp \
        src/ppfc.cpp \
        src/ppu.cpp \
+       src/apu.cpp \
        src/screen.cpp\
        src/plugin_save_load.cpp
 

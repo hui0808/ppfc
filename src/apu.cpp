@@ -12,7 +12,9 @@ void APU::reset(void) {
     memset(&this->pulseChannel2, 0, sizeof(this->pulseChannel2));
     memset(&this->triangleChannel, 0, sizeof(this->triangleChannel));
     memset(&this->noiseChannel, 0, sizeof(this->noiseChannel));
-    this->status.status = 0;
+    memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
+    this->writeableStatus.status = 0;
+    this->readableStatus.status = 0;
     this->frameCounter.value = 0;
     this->cycle = 0;
     this->dividerCount = 0;
@@ -26,49 +28,59 @@ void APU::run(void) {
         case 7456:
         case 11185:
         case 14914:
-        case 18640:
-            // 当模式1且14914 apu周期时， FrameCounter 不会触发
-            if (this->frameCounter.mode != 1 || this->cycle != 14914) this->clockFrameCounter();
+            this->clockFrameCounter();
             this->clockDivider();
     }
-    if (this->cycle == 18640) this->cycle = 0;
+    if (this->cycle == 14914) this->cycle = 0;
 }
 
 void APU::clockFrameCounter() {
     if (this->frameCounter.mode == 0) {
         // 4-step sequence
-        // 3 2 1 0
+        // 0 1 2 3
         // - - - i (i = trigger frame interrupt if interruptInhibit = 0)
         // - l - l (l = length counter and sweep unit) half frame
         // e e e e (e = envelope and triangle's linear counter) quarter frame
-        this->frameCounter.counter = (this->frameCounter.counter + 1) % 4;
-        if (this->frameCounter.counter == 0 && this->frameCounter.interruptInhibit == 0) {
-            this->status.frameCounterInterrupt = 1;
-            this->bus.cpu.handleIrq();
-        }
-        if (this->frameCounter.counter == 0 || this->frameCounter.counter == 2) {
-            this->clockLengthCounter();
-            this->clockSweepUnit();
-        }
-        this->clockEnvelope();
-        this->clockLinearCounter();
-    } else {
-        // 5-step sequence
-        // 4 3 2 1 0
-        // - l - l - (l = length counter and sweep unit) half frame
-        // e e e e - (e = envelope and triangle's linear counter) quarter frame
-        this->frameCounter.counter = (this->frameCounter.counter + 1) % 5;
         switch (this->frameCounter.counter) {
             case 1:
             case 3:
                 this->clockLengthCounter();
                 this->clockSweepUnit();
-            case 2:
-            case 4:
-                this->clockEnvelope();
-                this->clockLinearCounter();
+                if (this->frameCounter.interruptInhibit == 0) {
+                    this->readableStatus.frameCounterInterrupt = 1;
+                    this->bus.cpu.handleIrq();
+                }
         }
-
+        this->clockLinearCounter();
+        this->clockEnvelope();
+        this->frameCounter.counter = (this->frameCounter.counter + 1) % 4;
+    } else {
+        // 5-step sequence
+        // 0 1 2 3 4
+        // - l - - l (l = length counter and sweep unit) half frame
+        // e e e - e (e = envelope and triangle's linear counter) quarter frame
+        switch (this->frameCounter.counter) {
+            case 0:
+                this->clockLinearCounter();
+                this->clockEnvelope();
+                break;
+            case 1:
+                this->clockLengthCounter();
+                this->clockSweepUnit();
+                this->clockLinearCounter();
+                this->clockEnvelope();
+                break;
+            case 2:
+                this->clockLinearCounter();
+                this->clockEnvelope();
+                break;
+            case 4:
+                this->clockLengthCounter();
+                this->clockSweepUnit();
+                this->clockLinearCounter();
+                this->clockEnvelope();
+        }
+        this->frameCounter.counter = (this->frameCounter.counter + 1) % 5;
     }
 }
 
@@ -130,9 +142,76 @@ void APU::clockLinearCounter() {
 
 
 uint8_t APU::regRead(uint16_t addr) {
+    // apu 只有 $4015 状态寄存器可读
+    if (addr == 0x4015) {
+        // TODO
+        if (this->dmcChannel.sampleLength > 0) {
+            this->readableStatus.dmcActive = 1;
+        }
+        return this->readableStatus.status;
+    }
     return 0;
 }
 
 void APU::regWrite(uint16_t addr, uint8_t data) {
+    // pulse 1 channel $4000-$4003
+    if (addr == 0x4000) {
+        *(uint8_t*)(&this->pulseChannel1.reg0) = data;
+    } else if (addr == 0x4001) {
+        *(uint8_t*)(&this->pulseChannel1.reg1) = data;
+    } else if (addr == 0x4002) {
+        *(uint8_t*)(&this->pulseChannel1.reg2) = data;
+    } else if (addr == 0x4003) {
+        *(uint8_t*)(&this->pulseChannel1.reg3) = data;
+    }
+    // pulse 2 channel $4004-$4007
+    else if (addr == 0x4004) {
+        *(uint8_t*)(&this->pulseChannel2.reg0) = data;
+    } else if (addr == 0x4005) {
+        *(uint8_t*)(&this->pulseChannel2.reg1) = data;
+    } else if (addr == 0x4006) {
+        *(uint8_t*)(&this->pulseChannel2.reg2) = data;
+    } else if (addr == 0x4007) {
+        *(uint8_t*)(&this->pulseChannel2.reg3) = data;
+    }
+    // triangle channel $4008-$400B, $4009 unused
+    else if (addr == 0x4008) {
+        *(uint8_t*)(&this->triangleChannel.reg0) = data;
+    } else if (addr == 0x400A) {
+        *(uint8_t*)(&this->triangleChannel.reg1) = data;
+    } else if (addr == 0x400B) {
+        *(uint8_t*)(&this->triangleChannel.reg2) = data;
+    }
+    // noise channel $400C-$400F, $400D unused
+    else if (addr == 0x400C) {
+        *(uint8_t*)(&this->noiseChannel.reg0) = data;
+    } else if (addr == 0x400E) {
+        *(uint8_t*)(&this->noiseChannel.reg1) = data;
+    } else if (addr == 0x400F) {
+        *(uint8_t*)(&this->noiseChannel.reg2) = data;
+    }
+    // dmc channel $4010-$4013
+    else if (addr == 0x4010) {
+        *(uint8_t*)(&this->dmcChannel.reg0) = data;
+    } else if (addr == 0x4011) {
+        *(uint8_t*)(&this->dmcChannel.reg1) = data;
+    } else if (addr == 0x4012) {
+        this->dmcChannel.sampleAddress = data;
+    } else if (addr == 0x4013) {
+        this->dmcChannel.sampleLength = data;
+    }
+    // status register $4015
+    else if (addr == 0x4015) {
+        this->writeableStatus.status = data;
+        // clear dmc interrupt flag
+        this->dmcChannel.reg0.irqEnable = 0;
+        if (this->writeableStatus.dmcEnable) {
 
+        } else {
+            this->dmcChannel.sampleLength = 0;
+            this->dmcChannel.sampleAddress = 0;
+        }
+    } else if (addr == 0x4017) {
+        this->frameCounter.value = data;
+    }
 }

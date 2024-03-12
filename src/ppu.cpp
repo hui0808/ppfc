@@ -8,9 +8,10 @@ PPU::PPU(PPFC& bus) :bus(bus), memory(16384) {
     this->oamaddr = 0;
     this->scroll = 0;
     this->vaddr = 0;
-    this->frameClock = 0;
-    this->scanline = 0;
-    this->cycle = 0;
+    this->frameClock = 0; // 0- PPU 当前帧周期
+    // https://www.nesdev.org/wiki/File:Ppu.svg
+    this->scanline = 0; // 0-261 PPU 当前扫描行，0-239为可见扫描行，240为后垂直空白行，241-260为垂直空白行，261为预垂直空白行
+    this->cycle = 0; // 0-340 PPU 扫描行扫描一行的周期
     this->buffer = new uint32_t[256 * 240]();
     this->buf = this->buffer;
     memcpy(this->palette, gpalette, sizeof(gpalette));
@@ -96,6 +97,7 @@ void PPU::run(void) {
             this->cycle = 0;
             this->scanline = 0;
             this->odd = 0;
+            // TODO: frameRateLimit
             return;
         }
     } else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 1) {
@@ -105,6 +107,7 @@ void PPU::run(void) {
         if (this->mask.background || this->mask.sprite) {
             this->odd = 1;
         }
+        // TODO: frameRateLimit
         return;
     }
     this->frameRateLimit();
