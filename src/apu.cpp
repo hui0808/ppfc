@@ -1,7 +1,10 @@
 #include "ppfc.h"
 #include "apu.h"
 
-APU::APU(PPFC& bus) : bus(bus) {}
+APU::APU(PPFC& bus):
+    bus(bus),
+    pulse1(*this),
+    pulse2(*this) {}
 
 void APU::init(void) {
     this->reset();
@@ -215,3 +218,50 @@ void APU::regWrite(uint16_t addr, uint8_t data) {
         this->frameCounter.value = data;
     }
 }
+
+PULSE::PULSE(APU& bus) : bus(bus) {}
+
+void PULSE::init(void) {
+    this->reset();
+}
+
+void PULSE::reset(void) {
+    this->sequencer = 0;
+    this->timer = 0;
+    this->lengthCounter = 0;
+    this->sweepDividerCounter = 0;
+    this->sweepReload = 0;
+    this->sweepEnable = 0;
+    this->sweepShiftCount = 0;
+    this->sweepNegate = 0;
+    this->sweepPeriod = 0;
+    this->volume = 0;
+    this->constantVolume = 0;
+    this->lengthCounterHalt = 0;
+    this->duty = 0;
+    this->output = 0;
+}
+
+void PULSE::run(void) {
+    switch (this->duty) {
+        case (0):
+            if (this->sequencer < 7) this->output = 0;
+            else this->output = 1;
+            break;
+        case (1):
+            if (this->sequencer < 6) this->output = 0;
+            else this->output = 1;
+            break;
+        case (2):
+            if (this->sequencer < 4) this->output = 0;
+            else this->output = 1;
+            break;
+        case (3):
+            if (this->sequencer < 6) this->output = 1;
+            else this->output = 0;
+    }
+    if (this->timer == 0) {
+        this->sequencer = ((7 - this->sequencer) % 8) - 1
+    }
+}
+

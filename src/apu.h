@@ -3,34 +3,7 @@
 
 #include "common.h"
 class PPFC;
-
-struct PULSEREG {
-    struct {
-        uint8_t volume : 4;  // volume/envelope divider period
-        uint8_t constantVolume : 1;
-        uint8_t lengthCounterHalt : 1;
-        uint8_t duty : 2;
-    } reg0;
-    uint8_t lengthCounter;
-    // sweep unit
-    struct {
-        uint8_t sweepShiftCount : 3;
-        uint8_t sweepNegate : 1;
-        uint8_t sweepPeriod : 3;
-        uint8_t sweepEnable : 1;
-    } reg1;
-    uint8_t sweepDividerCounter; // sweep unit divider counter
-    uint8_t sweepReload; // sweep unit reload flag，force reload divider counter
-    // sweep unit end
-    uint16_t realTimer; // real timer, 11 bits, 0x000 - 0x7FF, inversely proportional to frequency
-    struct {
-        uint8_t timerLow : 8; // b0 - b7 of 11-bits timer
-    } reg2;
-    struct {
-        uint8_t timerHigh : 3; // b8 - b10 of 11-bits timer
-        uint8_t lengthCounterLoad : 5; // the index of length counter table
-    } reg3;
-};
+class PULSE;
 
 struct TRIANGLEREG {
     // $4008
@@ -126,6 +99,8 @@ union APUFRAMECOUNTER {
 class APU {
 public:
     PPFC& bus;
+    PULSE pulse1;
+    PULSE pulse2;
     PULSEREG pulseChannel1;
     PULSEREG pulseChannel2;
     TRIANGLEREG triangleChannel;
@@ -151,8 +126,55 @@ public:
 
     uint8_t regRead(uint16_t addr);
     void regWrite(uint16_t addr, uint8_t data);
+};
 
+class PULSE {
+    APU& bus;
+    uint8_t sequencer;
+    uint16_t timer : 11; // real timer, 11 bits, 0x000 - 0x7FF, inversely proportional to frequency
+    uint8_t lengthCounter; // 时长计数器
+    // envelope
 
+    uint8_t sweepDividerCounter; // sweep unit divider counter
+    uint8_t sweepReload; // sweep unit reload flag，force reload divider counter
+    uint8_t sweepEnable;
+    uint8_t sweepShiftCount;
+    uint8_t sweepNegate;
+    uint8_t sweepPeriod;
+
+    uint8_t volume;
+    uint8_t constantVolume;
+    uint8_t lengthCounterHalt;
+    uint8_t duty;
+
+    uint8_t output;
+    PULSE(APU& bus);
+    void reset(void);
+    void init(void);
+    void run(void);
+
+    struct PULSE_REG0 {
+        uint8_t volume : 4;  // volume/envelope divider period
+        uint8_t constantVolume : 1;
+        uint8_t lengthCounterHalt : 1;
+        uint8_t duty : 2;
+    };
+
+    struct PULSE_REG1 {
+        uint8_t sweepShiftCount : 3;
+        uint8_t sweepNegate : 1;
+        uint8_t sweepPeriod : 3;
+        uint8_t sweepEnable : 1;
+    };
+
+    struct PULSE_REG2 {
+        uint8_t timerLow : 8; // b0 - b7 of 11-bits timer
+    };
+
+    struct PULSE_REG3 {
+        uint8_t timerHigh : 3; // b8 - b10 of 11-bits timer
+        uint8_t lengthCounterLoad : 5; // the index of length counter table
+    };
 };
 
 #endif // __PPFC_APU_H__
