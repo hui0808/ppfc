@@ -59,6 +59,7 @@
  * 包络发生器有两种控制音量输出的方法
  * 一种是输出设定好的固定音量（sustain）
  * 一种是输出不断衰弱的锯齿波（decay）
+ * 如果向$4003、$4007、$400F写入，则设置start标志位为1
  * 工作原理
  * frame counter的四分之一帧时钟驱动
  *   如果start标志位为1，则清空标志位，decay level counter重新设置为15
@@ -76,12 +77,84 @@
  * 混音器(Mixer)
  * 混音器收集全部通道的输出，并将它们按照不同的比例组合在一起，最终转为模拟信号输出（范围0.0f~1.0f）
  */
-//
 
 
 #include "common.h"
 class PPFC;
-class PULSE;
+class APU;
+
+const uint8_t lengthTable[0x20] = {
+        10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
+    12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
+};
+
+struct Envelope {
+    uint8_t start; // start flag
+    uint8_t dividerCounter;
+    uint8_t volume; // constant volume value or dividerCounter reload value
+    uint8_t decayLevelCounter;
+    uint8_t loop; // decay level counter loop flag
+    uint8_t constantVolume; // constant volume flag
+    uint8_t output;
+};
+
+struct Sweep {
+    uint8_t enable; // enabled flag
+    uint8_t reload; // divider reload flag
+    uint8_t dividerLoad; // divider reload value
+    uint8_t dividerCounter;
+    uint8_t negate; // negate flag; 0-add, 1-subtract
+    uint8_t shiftCounter;
+    uint16_t targetPeriod;
+    uint8_t output; // 控制通道是否静音
+};
+
+class Pulse {
+public:
+    uint8_t channel; // 1 or 2
+    APU& bus;
+    Envelope envelope;
+    Sweep sweep;
+    uint8_t duty;
+    uint8_t sequencer;
+    uint16_t timerLoad : 11; // timerLoad, 11 bits, 0x000 - 0x7FF
+    uint16_t timer: 11;
+    uint8_t sequencerOutput; // 序列器输出，包含占空比信息
+    uint8_t lengthCounter; // 时长计数器
+    uint8_t lengthCounterLoad;
+    uint8_t lengthCounterHalt;
+    uint8_t output;
+
+    Pulse(APU& bus, uint8_t channel);
+    void reset(void);
+    void init(void);
+    void run(void);
+    void regWrite(uint16_t addr, uint8_t data);
+    void clockEnvelope(void);
+    void clockSweep(void);
+    void clockSweepDivider(void);
+    void clockLengthCounter(void);
+
+    struct PulseReg0 {
+        uint8_t volume : 4;  // volume/envelope divider period
+        uint8_t constantVolume : 1;
+        uint8_t lengthCounterHalt : 1;
+        uint8_t duty : 2;
+    };
+    struct PulseReg1 {
+        uint8_t sweepShiftCount : 3;
+        uint8_t sweepNegate : 1;
+        uint8_t sweepPeriod : 3;
+        uint8_t sweepEnable : 1;
+    };
+    struct PulseReg2 {
+        uint8_t timerLow : 8; // b0 - b7 of 11-bits timerLoad
+    };
+    struct PulseReg3 {
+        uint8_t timerHigh : 3; // b8 - b10 of 11-bits timerLoad
+        uint8_t lengthCounterLoad : 5; // the index of length counter table
+    };
+};
 
 struct TRIANGLEREG {
     // $4008
@@ -177,10 +250,8 @@ union APUFRAMECOUNTER {
 class APU {
 public:
     PPFC& bus;
-    PULSE pulse1;
-    PULSE pulse2;
-    PULSEREG pulseChannel1;
-    PULSEREG pulseChannel2;
+    Pulse pulseChannel1;
+    Pulse pulseChannel2;
     TRIANGLEREG triangleChannel;
     NOISEREG noiseChannel;
     DMCREG dmcChannel;
@@ -196,7 +267,6 @@ public:
     void run(void);
 
     void clockFrameCounter();
-    void clockDivider();
     void clockLengthCounter();
     void clockSweepUnit();
     void clockEnvelope();
@@ -204,55 +274,6 @@ public:
 
     uint8_t regRead(uint16_t addr);
     void regWrite(uint16_t addr, uint8_t data);
-};
-
-class PULSE {
-    APU& bus;
-    uint8_t sequencer;
-    uint16_t timer : 11; // real timer, 11 bits, 0x000 - 0x7FF, inversely proportional to frequency
-    uint8_t lengthCounter; // 时长计数器
-    // envelope
-
-    uint8_t sweepDividerCounter; // sweep unit divider counter
-    uint8_t sweepReload; // sweep unit reload flag，force reload divider counter
-    uint8_t sweepEnable;
-    uint8_t sweepShiftCount;
-    uint8_t sweepNegate;
-    uint8_t sweepPeriod;
-
-    uint8_t volume;
-    uint8_t constantVolume;
-    uint8_t lengthCounterHalt;
-    uint8_t duty;
-
-    uint8_t output;
-    PULSE(APU& bus);
-    void reset(void);
-    void init(void);
-    void run(void);
-
-    struct PULSE_REG0 {
-        uint8_t volume : 4;  // volume/envelope divider period
-        uint8_t constantVolume : 1;
-        uint8_t lengthCounterHalt : 1;
-        uint8_t duty : 2;
-    };
-
-    struct PULSE_REG1 {
-        uint8_t sweepShiftCount : 3;
-        uint8_t sweepNegate : 1;
-        uint8_t sweepPeriod : 3;
-        uint8_t sweepEnable : 1;
-    };
-
-    struct PULSE_REG2 {
-        uint8_t timerLow : 8; // b0 - b7 of 11-bits timer
-    };
-
-    struct PULSE_REG3 {
-        uint8_t timerHigh : 3; // b8 - b10 of 11-bits timer
-        uint8_t lengthCounterLoad : 5; // the index of length counter table
-    };
 };
 
 #endif // __PPFC_APU_H__
