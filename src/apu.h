@@ -259,7 +259,7 @@ public:
     APU_READABLE_STATUS readableStatus;
     APUFRAMECOUNTER frameCounter;
     uint32_t cycle;
-    uint8_t dividerCount;
+    uint8_t output;
 
     APU(PPFC& bus);
     void reset(void);
@@ -272,8 +272,12 @@ public:
     void clockEnvelope();
     void clockLinearCounter();
 
-    uint8_t regRead(uint16_t addr);
-    void regWrite(uint16_t addr, uint8_t data);
+    uint8_t channelRegRead(uint16_t addr);
+    void channelRegWrite(uint16_t addr, uint8_t data);
+    uint8_t statusRegRead(uint16_t addr);
+    void statusRegWrite(uint16_t addr, uint8_t data);
+    void frameCounterRegWrite(uint16_t addr, uint8_t data);
+    void mix();
 };
 
 #endif // __PPFC_APU_H__

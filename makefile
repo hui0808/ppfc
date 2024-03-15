@@ -33,7 +33,8 @@ SRCS = src/cartridge.cpp \
        src/ppfc.cpp \
        src/ppu.cpp \
        src/apu.cpp \
-       src/screen.cpp\
+       src/screen.cpp \
+       src/speaker.cpp \
        src/plugin_save_load.cpp
 
 # Object files

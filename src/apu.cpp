@@ -7,6 +7,8 @@ APU::APU(PPFC& bus):
     pulseChannel2(*this, 2) {}
 
 void APU::init(void) {
+    this->pulseChannel1.init();
+    this->pulseChannel2.init();
     this->reset();
 }
 
@@ -18,7 +20,7 @@ void APU::reset(void) {
     this->readableStatus.status = 0;
     this->frameCounter.value = 0;
     this->cycle = 0;
-    this->dividerCount = 0;
+    this->output = 0;
 }
 
 void APU::run(void) {
@@ -35,6 +37,18 @@ void APU::run(void) {
     if (this->cycle == 14914) this->cycle = 0;
     if (this->writeableStatus.pulse1Enable) this->pulseChannel1.run();
     if (this->writeableStatus.pulse2Enable) this->pulseChannel2.run();
+    this->mix();
+}
+
+void APU::mix(void) {
+    // https://www.nesdev.org/wiki/APU_Mixer
+    float pulseOut = 0;
+    float fndOut = 0;
+    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
+        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
+    }
+    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
+    this->output = output;
 }
 
 void APU::clockFrameCounter() {
@@ -87,7 +101,7 @@ void APU::clockSweepUnit() {
 }
 
 void APU::clockEnvelope() {
-    this->pulseChannel1.clockEnvelope();
+   this->pulseChannel1.clockEnvelope();
     this->pulseChannel2.clockEnvelope();
 }
 
@@ -95,23 +109,14 @@ void APU::clockLinearCounter() {
 
 }
 
-
-
-uint8_t APU::regRead(uint16_t addr) {
-    // apu 只有 $4015 状态寄存器可读
-    if (addr == 0x4015) {
-        // TODO
-        if (this->dmcChannel.sampleLength > 0) {
-            this->readableStatus.dmcActive = 1;
-        }
-        return this->readableStatus.status;
-    }
+uint8_t APU::channelRegRead(uint16_t addr) {
     return 0;
 }
 
-void APU::regWrite(uint16_t addr, uint8_t data) {
+void APU::channelRegWrite(uint16_t addr, uint8_t data) {
     // pulse 1 channel $4000-$4003
     // pulse 2 channel $4004-$4007
+    addr |= 0x4000;
     if (0x4000 <= addr && addr <= 0x4003) {
         this->pulseChannel1.regWrite(addr, data);
     } else if (0x4004 <= addr && addr <= 0x4007) {
@@ -144,31 +149,54 @@ void APU::regWrite(uint16_t addr, uint8_t data) {
     } else if (addr == 0x4013) {
         this->dmcChannel.sampleLength = data;
     }
-    // status register $4015
-    else if (addr == 0x4015) {
-        this->writeableStatus.status = data;
-        if (this->writeableStatus.pulse1Enable) {
-            this->pulseChannel1.lengthCounter = lengthTable[this->pulseChannel1.lengthCounterLoad];
-        } else {
-            this->pulseChannel1.lengthCounter = 0;
-        }
-        if (this->writeableStatus.pulse2Enable) {
-            this->pulseChannel2.lengthCounter = lengthTable[this->pulseChannel2.lengthCounterLoad];
-        } else {
-            this->pulseChannel2.lengthCounter = 0;
-        }
-        // clear dmc interrupt flag
-        this->dmcChannel.reg0.irqEnable = 0;
-        if (this->writeableStatus.dmcEnable) {
+}
 
-        } else {
-            this->dmcChannel.sampleLength = 0;
-            this->dmcChannel.sampleAddress = 0;
-        }
-    } else if (addr == 0x4017) {
-        this->frameCounter.value = data;
-        this->cycle = 0;
+uint8_t APU::statusRegRead(uint16_t addr) {
+    // apu 只有 $4015 状态寄存器可读
+    // TODO
+    if (this->pulseChannel1.lengthCounter > 0 && this->pulseChannel1.lengthCounterHalt == 0) {
+        this->readableStatus.pulse1LengthCounterZero = 1;
     }
+    if (this->pulseChannel2.lengthCounter > 0 && this->pulseChannel2.lengthCounterHalt == 0) {
+        this->readableStatus.pulse2LengthCounterZero = 1;
+    }
+    if (this->dmcChannel.sampleLength > 0) {
+        this->readableStatus.dmcActive = 1;
+    }
+    return this->readableStatus.status;
+}
+
+void APU::statusRegWrite(uint16_t addr, uint8_t data) {
+    // status register $4015
+    this->writeableStatus.status = data;
+    if (this->writeableStatus.pulse1Enable) {
+        this->pulseChannel1.lengthCounter = lengthTable[this->pulseChannel1.lengthCounterLoad];
+    } else {
+        this->pulseChannel1.lengthCounter = 0;
+    }
+    if (this->writeableStatus.pulse2Enable) {
+        this->pulseChannel2.lengthCounter = lengthTable[this->pulseChannel2.lengthCounterLoad];
+    } else {
+        this->pulseChannel2.lengthCounter = 0;
+    }
+    // clear dmc interrupt flag
+    this->dmcChannel.reg0.irqEnable = 0;
+    if (this->writeableStatus.dmcEnable) {
+
+    } else {
+        this->dmcChannel.sampleLength = 0;
+        this->dmcChannel.sampleAddress = 0;
+    }
+}
+
+void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
+    // $4017
+    this->frameCounter.value = data;
+//    this->cycle = 0;
+    /** TODO
+     * 	After 4 CPU clock cycles*, the timer is reset.
+     * 	If the mode flag is set, then both "quarter frame" and "half frame" signals are also generated.
+     */
 }
 
 Pulse::Pulse(APU& bus, uint8_t channel) : channel(channel), bus(bus) {}
@@ -226,9 +254,10 @@ void Pulse::run(void) {
     } else {
         this->output = 0;
     }
-    if (this->channel == 2) {
-        printf("\r pulse output: %d", this->output);
-    }
+//    printf("sweep output: %d, sequencer output: %d, length counter: %d, output: %d\n", this->sweep.output, this->sequencerOutput, this->lengthCounter, this->output);
+//    if (this->channel == 2) {
+//        printf("pulse output: %d\n", this->output);
+//    }
 }
 
 void Pulse::regWrite(uint16_t addr, uint8_t data) {
@@ -295,7 +324,6 @@ void Pulse::clockEnvelope(void) {
 
 void Pulse::clockSweep(void) {
     // https://www.nesdev.org/wiki/APU_Sweep
-    if (!this->sweep.enable) return;
     uint16_t changeAmount = this->timerLoad >> this->sweep.shiftCounter;
     // timer是11bit
     if (this->sweep.negate) {
@@ -314,7 +342,7 @@ void Pulse::clockSweep(void) {
 }
 
 void Pulse::clockSweepDivider(void) {
-    // 当shiftCounter为0时，相当与enable为0的效果
+    // 当shiftCounter为0时，相当于enable为0的效果
     if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0 && this->sweep.output) {
         // 更新方波通道的周期
         this->timerLoad = this->sweep.targetPeriod;
