@@ -26,6 +26,7 @@ class PPFC {
 public:
     uint8_t status;
     Cartridge cartridge;
+    Speaker speaker;
     CPU cpu;
     PPU ppu;
     APU apu;

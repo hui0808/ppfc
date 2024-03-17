@@ -8,7 +8,7 @@ Screen::Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height) :b
 }
 
 void Screen::init(void) {
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         error(format("Screen: could not initialize SDL2: %s", SDL_GetError()));
     }
     // 创建窗口 

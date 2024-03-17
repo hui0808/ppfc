@@ -1,10 +1,10 @@
-#include "apu.h"
 #include "ppfc.h"
+#include "apu.h"
 
 APU::APU(PPFC& bus):
     bus(bus),
-    pulseChannel1(*this, 1),
-    pulseChannel2(*this, 2) {}
+    pulseChannel1(*this, 0),
+    pulseChannel2(*this, 1) {}
 
 void APU::init(void) {
     this->pulseChannel1.init();
@@ -154,10 +154,10 @@ void APU::channelRegWrite(uint16_t addr, uint8_t data) {
 uint8_t APU::statusRegRead(uint16_t addr) {
     // apu 只有 $4015 状态寄存器可读
     // TODO
-    if (this->pulseChannel1.lengthCounter > 0 && this->pulseChannel1.lengthCounterHalt == 0) {
+    if (this->pulseChannel1.enable != 0 && this->pulseChannel1.lengthCounter > 0) {
         this->readableStatus.pulse1LengthCounterZero = 1;
     }
-    if (this->pulseChannel2.lengthCounter > 0 && this->pulseChannel2.lengthCounterHalt == 0) {
+    if (this->pulseChannel2.enable != 0 && this->pulseChannel2.lengthCounter > 0) {
         this->readableStatus.pulse2LengthCounterZero = 1;
     }
     if (this->dmcChannel.sampleLength > 0) {
@@ -172,9 +172,11 @@ void APU::statusRegWrite(uint16_t addr, uint8_t data) {
     if (this->writeableStatus.pulse1Enable) {
         this->pulseChannel1.lengthCounter = lengthTable[this->pulseChannel1.lengthCounterLoad];
     } else {
+        this->pulseChannel1.enable = 0;
         this->pulseChannel1.lengthCounter = 0;
     }
     if (this->writeableStatus.pulse2Enable) {
+        this->pulseChannel2.enable = 0;
         this->pulseChannel2.lengthCounter = lengthTable[this->pulseChannel2.lengthCounterLoad];
     } else {
         this->pulseChannel2.lengthCounter = 0;
@@ -207,6 +209,7 @@ void Pulse::init(void) {
 
 void Pulse::reset(void) {
     this->envelope = {0};
+    this->enable = 0;
     this->sweep = {0};
     this->duty = 0;
     this->sequencer = 0;
@@ -291,6 +294,9 @@ void Pulse::regWrite(uint16_t addr, uint8_t data) {
         this->sequencer = 0;
         // side effect, set the envelope start flag
         this->envelope.start = 1;
+        if ((this->channel == 0 && this->bus.writeableStatus.pulse1Enable) || (this->channel == 1 && this->bus.writeableStatus.pulse2Enable)) {
+            this->enable = 1;
+        }
     }
 }
 
@@ -328,12 +334,12 @@ void Pulse::clockSweep(void) {
     // timer是11bit
     if (this->sweep.negate) {
         this->sweep.targetPeriod = this->timerLoad - changeAmount;
-        if (this->channel == 1) this->sweep.targetPeriod--;
+        if (this->channel == 0) this->sweep.targetPeriod--;
     } else {
         this->sweep.targetPeriod = this->timerLoad + changeAmount;
     }
     // targetPeriod 溢出了或者当前周期小于8，需要钳制为0，且使通道静音
-    if ((this->sweep.targetPeriod > (this->channel == 1 ? 0x07FE : 0x07FF)) || this->timerLoad < 8) {
+    if ((this->sweep.targetPeriod > (this->channel == 0 ? 0x07FE : 0x07FF)) || this->timerLoad < 8) {
         this->sweep.targetPeriod = 0;
         this->sweep.output = 0;
     } else {

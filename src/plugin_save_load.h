@@ -39,16 +39,7 @@ struct PpuData {
     uint8_t spindexes[32] = {0}; // 调色板索引
     uint8_t oam[256] = {0}; // 精灵数据, 有64个4 byte 精灵
     Palette palette[64] = {0}; // 调色板
-/*
-    no need to save
 
-    uint32_t *buffer; // 显示缓存
-    uint32_t *buf;
-
-    float fps;
-    uint64_t current;
-    uint64_t last;
-*/
     uint16_t finex;
     uint16_t tmpfinex;
     uint16_t tmpvaddr;

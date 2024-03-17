@@ -111,7 +111,8 @@ struct Sweep {
 
 class Pulse {
 public:
-    uint8_t channel; // 1 or 2
+    uint8_t channel; // 0 or 1
+    uint8_t enable;
     APU& bus;
     Envelope envelope;
     Sweep sweep;

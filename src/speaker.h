@@ -9,10 +9,9 @@ class Speaker {
 public:
     PPFC& bus;
     SDL_AudioSpec spec;
-    SDL_AudioDeviceID device;
+    uint64_t last;
     Speaker(PPFC& bus);
     void init(void);
-    void fill(void *userdata, uint8_t *stream, int len);
     void sample(void);
 };
 
