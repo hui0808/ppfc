@@ -4,7 +4,11 @@
 PluginSaveLoad::PluginSaveLoad(PPFC& bus) :bus(bus){
     std::string savDir = "./sav";
     if (!opendir(savDir.c_str())) {
-        mkdir(savDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        #if defined(WIN)
+            mkdir(savDir.c_str());
+        #elif defined(UNIX)
+            mkdir(savDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        #endif
     }
     this->sav_path = "./sav/fc.sav";
 }
@@ -43,11 +47,6 @@ void PluginSaveLoad::save(void) {
     memcpy(ppuData.spindexes, this->bus.ppu.spindexes, sizeof(this->bus.ppu.spindexes)),
     memcpy(ppuData.oam, this->bus.ppu.oam, sizeof(this->bus.ppu.oam));
     memcpy(ppuData.palette, this->bus.ppu.palette, sizeof(this->bus.ppu.palette));
-    ppuData.buffer = this->bus.ppu.buffer;
-    ppuData.buf = this->bus.ppu.buf;
-    ppuData.fps = this->bus.ppu.fps;
-    ppuData.current = this->bus.ppu.current;
-    ppuData.last = this->bus.ppu.last;
     ppuData.finex = this->bus.ppu.finex;
     ppuData.tmpfinex = this->bus.ppu.tmpfinex;
     ppuData.tmpvaddr = this->bus.ppu.tmpvaddr;
@@ -75,7 +74,8 @@ void PluginSaveLoad::save(void) {
 
     FILE* file = fopen(this->sav_path, "wb");  // 以二进制写入模式创建文件
     if (file == NULL) {
-        error("无法创建文件\n");
+        error("PluginSaveLoad save can not open sav_file\n");
+        return ;
     }
     fseek(file, 0, SEEK_SET);  // 将文件指针移动到文件开头
     fwrite(&savData, sizeof(savData), 1, file);  // 写入 cpuData
@@ -85,7 +85,8 @@ void PluginSaveLoad::save(void) {
 void PluginSaveLoad::load(void) {
     FILE* file = fopen(this->sav_path, "rb");  // 以二进制读取模式打开文件
     if (file == NULL) {
-        error("无法打开文件\n");
+        error("PluginSaveLoad load can not open sav_file\n");
+        return ;
     }
     fseek(file, 0, SEEK_SET);  // 将文件指针移动到文件开头
     SavData savData;
@@ -120,11 +121,6 @@ void PluginSaveLoad::load(void) {
     memcpy(this->bus.ppu.spindexes, savData.ppuData.spindexes, sizeof(this->bus.ppu.spindexes));
     memcpy(this->bus.ppu.oam, savData.ppuData.oam, sizeof(this->bus.ppu.oam));
     memcpy(this->bus.ppu.palette, savData.ppuData.palette, sizeof(this->bus.ppu.palette));
-    this->bus.ppu.buffer = savData.ppuData.buffer;
-    this->bus.ppu.buf = savData.ppuData.buf;
-    this->bus.ppu.fps = savData.ppuData.fps;
-    this->bus.ppu.current = savData.ppuData.current;
-    this->bus.ppu.last = savData.ppuData.last;
     this->bus.ppu.finex = savData.ppuData.finex;
     this->bus.ppu.tmpfinex = savData.ppuData.tmpfinex;
     this->bus.ppu.tmpvaddr = savData.ppuData.tmpvaddr;
