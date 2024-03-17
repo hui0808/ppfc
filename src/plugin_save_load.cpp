@@ -72,26 +72,26 @@ void PluginSaveLoad::save(void) {
     savData.ppuData = ppuData;
     printf("save pc %d \n", cpuData.pc);
 
-    FILE* file = fopen(this->sav_path, "wb");  // 以二进制写入模式创建文件
+    FILE* file = fopen(this->sav_path, "wb");
     if (file == NULL) {
         error("PluginSaveLoad save can not open sav_file\n");
         return ;
     }
-    fseek(file, 0, SEEK_SET);  // 将文件指针移动到文件开头
-    fwrite(&savData, sizeof(savData), 1, file);  // 写入 cpuData
+    fseek(file, 0, SEEK_SET);
+    fwrite(&savData, sizeof(savData), 1, file);
     fclose(file);   // 关闭文件
 }
 
 void PluginSaveLoad::load(void) {
-    FILE* file = fopen(this->sav_path, "rb");  // 以二进制读取模式打开文件
+    FILE* file = fopen(this->sav_path, "rb");
     if (file == NULL) {
         error("PluginSaveLoad load can not open sav_file\n");
         return ;
     }
-    fseek(file, 0, SEEK_SET);  // 将文件指针移动到文件开头
+    fseek(file, 0, SEEK_SET);
     SavData savData;
-    fread(&savData, sizeof(SavData), 1, file);  // 从文件中读取数据到 savData
-    fclose(file);  // 关闭文件
+    fread(&savData, sizeof(SavData), 1, file);
+    fclose(file);
 
     // cpu
     memcpy(this->bus.cpu.ram, savData.cpuData.ram, sizeof(this->bus.cpu.ram));
