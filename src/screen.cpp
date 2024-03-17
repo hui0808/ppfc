@@ -42,7 +42,7 @@ void Screen::init(void) {
     this->bus.registerFunc(SDL_WINDOWEVENT, EVENTBIND(this->resize));
 }
 
-void Screen::updata(uint32_t *buffer) {
+void Screen::update(uint32_t *buffer) {
     int pitch;
     void *pixels = NULL;
     if(this->texture == nullptr) {

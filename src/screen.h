@@ -20,7 +20,7 @@ public:
 
     Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height);
     void init(void);
-    void updata(uint32_t *buffer);
+    void update(uint32_t *buffer);
     void clear(void);
     void render(void);
     void quit(void);
