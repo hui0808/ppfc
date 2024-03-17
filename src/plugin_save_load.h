@@ -1,6 +1,3 @@
-//
-// Created by Xu on 2024/3/17.
-//
 #ifndef PPFC_PLUGIN_SAVE_LOAD_H
 #define PPFC_PLUGIN_SAVE_LOAD_H
 
