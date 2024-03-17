@@ -1,5 +1,5 @@
-#include "screen.h"
 #include "ppfc.h"
+#include "screen.h"
 
 Screen::Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height) :bus(bus) {
     this->title = title;

@@ -1,5 +1,5 @@
-#include "mapper.h"
 #include "ppfc.h"
+#include "mapper.h"
 
 #define MAPPER(n) case(n): this->mapper##n(); return
 

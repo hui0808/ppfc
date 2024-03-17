@@ -1,5 +1,5 @@
-#include "cpu.h"
 #include "ppfc.h"
+#include "cpu.h"
 
 CPU::CPU(PPFC& bus) :bus(bus), memory(65536) {
     this->a = 0;

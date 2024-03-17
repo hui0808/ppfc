@@ -22,11 +22,11 @@ enum PPFCStatus {
 class PPFC {
 public:
     uint8_t status;
-    Screen screen;
     Cartridge cartridge;
     CPU cpu;
     PPU ppu;
     Mapper mapper;
+    Screen screen;
     Keyboard keyboard;
 
     EventList events;

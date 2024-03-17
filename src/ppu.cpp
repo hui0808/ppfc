@@ -1,5 +1,5 @@
-#include "ppu.h"
 #include "ppfc.h"
+#include "ppu.h"
 
 PPU::PPU(PPFC& bus) :bus(bus), memory(16384) {
     this->ctrl.ctrl = 0;

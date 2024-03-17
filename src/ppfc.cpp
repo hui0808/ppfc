@@ -1,7 +1,12 @@
 #include "ppfc.h"
 
-PPFC::PPFC(const char* path) :cartridge(path), cpu(*this),
-        ppu(*this), mapper(*this) , screen(*this, "PPFC", 256, 240), keyboard(*this) {
+PPFC::PPFC(const char* path) :
+        cartridge(path),
+        cpu(*this),
+        ppu(*this),
+        mapper(*this),
+        screen(*this, "PPFC", 256, 240),
+        keyboard(*this) {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         error(format("Screen: could not initialize SDL2: %s", SDL_GetError()));
     }

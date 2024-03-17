@@ -1,5 +1,5 @@
-#include "keyboard.h"
 #include "ppfc.h"
+#include "keyboard.h"
 
 Keyboard::Keyboard(PPFC& bus) :bus(bus) {
     this->player1 = 0;

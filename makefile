@@ -4,7 +4,7 @@
 CC = g++
 
 # Compiler flags
-CFLAGS = -std=c++11 -Wall -O2
+CFLAGS = -std=c++11 -Wall -g
 
 # Include directories
 ifeq ($(OS),Windows_NT)
@@ -44,6 +44,12 @@ else
 	TARGET = ppfc
 endif
 
+ifeq ($(OS),Windows_NT)
+	FixPath = $(subst /,\,$(addprefix ",$(addsuffix ",$1)))
+else
+	FixPath = $1
+endif
+
 # Build rules
 all: $(TARGET)
 
@@ -54,4 +60,6 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(IDIR) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	$(RM) $(call FixPath,$(OBJS)) $(TARGET)
+
+.PHONY: clean
