@@ -14,8 +14,12 @@ void Keyboard::init(void) {
 void Keyboard::keydown(SDL_Event& event) {
     uint32_t key = event.key.keysym.sym;
     uint16_t mod = event.key.keysym.mod;
-    if ((mod & KMOD_CTRL) && (key == '3')) { // reset --- ctrl + 3
+    if ((mod & KMOD_CTRL) && (key == SDLK_3)) { // reset --- ctrl + 3
         this->bus.status = PPFC_RESET;
+    } else if ((mod & KMOD_SHIFT) && (key == SDLK_F1)) { // save --- shift + f1
+        this->bus.save();
+    } else if (key == SDLK_F1) { // load --- f1
+        this->bus.load();
     } else {
         for (uint8_t i = 0; i < sizeof(this->map); i++) {
             if (key == this->map[i]) {
