@@ -8,6 +8,9 @@ Screen::Screen(PPFC& bus, const char *title, uint16_t width, uint16_t height) :b
 }
 
 void Screen::init(void) {
+    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+        error(format("Screen: could not initialize SDL2: %s", SDL_GetError()));
+    }
     // 创建窗口 
     this->window = SDL_CreateWindow(
         title,
@@ -17,8 +20,14 @@ void Screen::init(void) {
         height,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
     );
+    if(this->window == nullptr) {
+        error(format("window: could not initialize SDL2: %s", SDL_GetError()));
+    }
 
     this->renderer = SDL_CreateRenderer(this->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if(this->renderer == nullptr) {
+        error(format("renderer: could not initialize SDL2: %s", SDL_GetError()));
+    }
     this->texture = SDL_CreateTexture(
         this->renderer,
         SDL_PIXELFORMAT_RGBA8888,
@@ -26,15 +35,21 @@ void Screen::init(void) {
         width,
         height
     );
+    if(this->texture == nullptr) {
+        error(format("texture: could not initialize SDL2: %s", SDL_GetError()));
+    }
     this->mutex = SDL_CreateMutex();
     this->bus.registerFunc(SDL_WINDOWEVENT, EVENTBIND(this->resize));
 }
 
 void Screen::updata(uint32_t *buffer) {
-    uint32_t pitch;
+    int pitch;
     void *pixels = NULL;
-    SDL_LockTexture(this->texture, NULL, (void**)&pixels, (int*)&pitch);
-    memcpy(pixels, buffer, pitch * this->height);
+    if(this->texture == nullptr) {
+        error(format("texture: could not get anything SDL2: %s", SDL_GetError()));
+    }
+    SDL_LockTexture(this->texture, NULL, (void**)&pixels, &pitch);
+    memcpy(pixels, buffer, uint32_t(pitch) * this->height);
     SDL_UnlockTexture(this->texture);
 }
 

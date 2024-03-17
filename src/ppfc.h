@@ -8,6 +8,7 @@
 #include "mapper.h"
 #include "screen.h"
 #include "keyboard.h"
+#include "plugin_save_load.h"
 
 using EventCallBack = std::function<void(SDL_Event&)>;
 using EventPair = std::pair<uint16_t, EventCallBack>;
@@ -28,6 +29,7 @@ public:
     Mapper mapper;
     Screen screen;
     Keyboard keyboard;
+    PluginSaveLoad pluginSaveLoad;
 
     EventList events;
 
@@ -37,7 +39,8 @@ public:
     void beforeRun(void);
     void handleEvent(void);
     void registerFunc(uint16_t eventType, EventCallBack callback);
-
+    void save(void);
+    void load(void);
     void quit(void);
     void quit(SDL_Event& event);
 };

@@ -4,7 +4,7 @@
 CC = g++
 
 # Compiler flags
-CFLAGS = -std=c++11 -Wall -g
+CFLAGS = -std=c++11 -Wall -O1 -g
 
 # Include directories
 ifeq ($(OS),Windows_NT)
@@ -32,7 +32,8 @@ SRCS = src/cartridge.cpp \
        src/memory.cpp \
        src/ppfc.cpp \
        src/ppu.cpp \
-       src/screen.cpp
+       src/screen.cpp\
+       src/plugin_save_load.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)

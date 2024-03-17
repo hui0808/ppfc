@@ -6,10 +6,9 @@ PPFC::PPFC(const char* path) :
         ppu(*this),
         mapper(*this),
         screen(*this, "PPFC", 256, 240),
-        keyboard(*this) {
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-        error(format("Screen: could not initialize SDL2: %s", SDL_GetError()));
-    }
+        keyboard(*this),
+        pluginSaveLoad(*this){
+
     this->status = PPFC_STOP;
 }
 
@@ -19,6 +18,7 @@ void PPFC::init(void) {
     this->ppu.init();
     this->screen.init();
     this->keyboard.init();
+    this->pluginSaveLoad.init();
 
     registerFunc(SDL_QUIT, EVENTBIND(this->quit));
 }
@@ -78,6 +78,14 @@ void PPFC::handleEvent(void) {
 
 void PPFC::registerFunc(uint16_t eventType, EventCallBack callback) {
     this->events.push_back(EventPair(eventType, callback));
+}
+
+void PPFC::save(void) {
+    this->pluginSaveLoad.save();
+}
+
+void PPFC::load(void) {
+    this->pluginSaveLoad.load();
 }
 
 void PPFC::quit(void) {
