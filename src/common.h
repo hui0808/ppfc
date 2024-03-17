@@ -18,8 +18,10 @@
 #include "utils.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(WIN64) || defined(_WIN64) || defined(_WIN64_)
+#define WIN
 #include "SDL.h" // Windows
 #elif defined(__linux__) || defined(__MACOSX) || defined(__MACOS_CLASSIC__) || defined(__APPLE__) || defined(__apple__)
+#define UNIX
 #include <SDL2/SDL.h> // Linux
 #endif
 

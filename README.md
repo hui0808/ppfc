@@ -66,13 +66,15 @@ A simple fc emulator implemented in c++11 using SDL2 (for Windowns and Linux)
 
 **Other**
 
-| Action |   Key    |
-| :----: | :------: |
-| Reset  | Ctrl + 3 |
+| Action |    Key     |
+|:------:|:----------:|
+| Reset  |  Ctrl + 3  |
+|  Save  | shift + f1 |
+|  Load  |     f1     |
 
 # TODO
 
-- [ ] Save/Load
+- [x] Save/Load
 - [ ] APU
 - [ ] Trainer (金手指)
 - [ ] 将该项目移植到stm32或esp32上运行

@@ -44,7 +44,7 @@ void PPFC::run(void) {
             this->status = PPFC_RUN;
             break;
         }
-        this->screen.updata(this->ppu.buf);
+        this->screen.update(this->ppu.buf);
         this->screen.render();
         this->handleEvent();
     }

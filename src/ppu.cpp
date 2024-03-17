@@ -246,7 +246,7 @@ void PPU::renderSprite(void) {
                     res = (p | ((sprite[2] >> 2) & 0x0C)) + 16;
                 }
 
-                // updata sprite 0 hit flag
+                // update sprite 0 hit flag
 #if 0
                 if (this->sprZero == sprite && (this->pixel & 0x03))
 #else
