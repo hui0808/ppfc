@@ -10,8 +10,10 @@ public:
     PPFC& bus;
     SDL_AudioSpec spec;
     uint64_t last;
+    std::thread task;
     Speaker(PPFC& bus);
     void init(void);
+    void run(void);
     void sample(void);
 };
 

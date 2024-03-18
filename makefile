@@ -21,7 +21,7 @@ else
 endif
 
 # Libraries to link
-LIBS = -lSDL2
+LIBS = -lSDL2 -lpthread
 
 # Source files
 SRCS = src/cartridge.cpp \
@@ -66,3 +66,9 @@ clean:
 	$(RM) $(call FixPath,$(OBJS)) $(TARGET)
 
 .PHONY: clean
+
+test:
+	$(CC) $(CFLAGS) src/test.cpp -o test.exe
+
+audio_test:
+	$(CC) $(CFLAGS) src/audio_test.cpp -o audio_test.exe $(IDIR) $(LDIR) $(LIBS)
