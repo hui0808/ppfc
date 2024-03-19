@@ -385,7 +385,7 @@ void PPU::frameRateLimit(void) {
         this->current = SDL_GetPerformanceCounter();
         this->fps = float(SDL_GetPerformanceFrequency()) / (this->current - this->last);
         this->last = this->current;
-        printf("\rFPS: %.2f", this->fps);
+//        printf("\rFPS: %.2f", this->fps);
     }
 }
 

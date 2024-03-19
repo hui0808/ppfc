@@ -194,7 +194,7 @@ void APU::statusRegWrite(uint16_t addr, uint8_t data) {
 void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
     // $4017
     this->frameCounter.value = data;
-//    this->cycle = 0;
+    this->cycle = 0;
     /** TODO
      * 	After 4 CPU clock cycles*, the timer is reset.
      * 	If the mode flag is set, then both "quarter frame" and "half frame" signals are also generated.
@@ -252,7 +252,7 @@ void Pulse::run(void) {
         this->timer--;
     }
     // 方波输出
-    if (this->sweep.output != 0 && this->sequencerOutput != 0 && this->lengthCounter != 0) {
+    if (this->enable && this->sweep.output != 0 && this->sequencerOutput != 0 && this->lengthCounter != 0) {
         this->output = this->envelope.output;
     } else {
         this->output = 0;
@@ -333,9 +333,11 @@ void Pulse::clockSweep(void) {
     uint16_t changeAmount = this->timerLoad >> this->sweep.shiftCounter;
     // timer是11bit
     if (this->sweep.negate) {
+        // 减少周期
         this->sweep.targetPeriod = this->timerLoad - changeAmount;
         if (this->channel == 0) this->sweep.targetPeriod--;
     } else {
+        // 增加周期
         this->sweep.targetPeriod = this->timerLoad + changeAmount;
     }
     // targetPeriod 溢出了或者当前周期小于8，需要钳制为0，且使通道静音
