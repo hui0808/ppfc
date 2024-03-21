@@ -27,6 +27,8 @@ void APU::run(void) {
     this->cycle++;
     // https://www.nesdev.org/wiki/APU_Frame_Counter
     // 每隔大约1/4帧时间就会触发一次
+    if (this->writeableStatus.pulse1Enable) this->pulseChannel1.run();
+    if (this->writeableStatus.pulse2Enable) this->pulseChannel2.run();
     switch (this->cycle) {
         case 3728:
         case 7456:
@@ -35,19 +37,18 @@ void APU::run(void) {
             this->clockFrameCounter();
     }
     if (this->cycle == 14914) this->cycle = 0;
-    if (this->writeableStatus.pulse1Enable) this->pulseChannel1.run();
-    if (this->writeableStatus.pulse2Enable) this->pulseChannel2.run();
     this->mix();
 }
 
 void APU::mix(void) {
     // https://www.nesdev.org/wiki/APU_Mixer
-    float pulseOut = 0;
-    float fndOut = 0;
-    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
-        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
-    }
-    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
+//    float pulseOut = 0;
+//    float fndOut = 0;
+//    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
+//        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
+//    }
+//    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
+    uint8_t output = uint8_t ((this->pulseChannel1.output + this->pulseChannel2.output) * 8.5 + 0.5);
     this->output = output;
 }
 
@@ -163,7 +164,10 @@ uint8_t APU::statusRegRead(uint16_t addr) {
     if (this->dmcChannel.sampleLength > 0) {
         this->readableStatus.dmcActive = 1;
     }
-    return this->readableStatus.status;
+    uint8_t ret = this->readableStatus.status;
+    // clear frame counter interrupt after
+    this->readableStatus.frameCounterInterrupt = 0;
+    return ret;
 }
 
 void APU::statusRegWrite(uint16_t addr, uint8_t data) {
@@ -195,9 +199,18 @@ void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
     // $4017
     this->frameCounter.value = data;
     this->cycle = 0;
+    if (this->frameCounter.interruptInhibit) {
+        this->readableStatus.frameCounterInterrupt = 0;
+    }
+    // If the mode flag is set, then both "quarter frame" and "half frame" signals are also generated.
+    if (this->frameCounter.mode) {
+        this->clockSweepUnit();
+        this->clockLengthCounter();
+        this->clockLinearCounter();
+        this->clockEnvelope();
+    }
     /** TODO
      * 	After 4 CPU clock cycles*, the timer is reset.
-     * 	If the mode flag is set, then both "quarter frame" and "half frame" signals are also generated.
      */
 }
 
@@ -292,6 +305,7 @@ void Pulse::regWrite(uint16_t addr, uint8_t data) {
         // https://forums.nesdev.org/viewtopic.php?p=186129#p186129
         // 清空 sequencers，重置相位
         this->sequencer = 0;
+        this->timer = 0;
         // side effect, set the envelope start flag
         this->envelope.start = 1;
         if ((this->channel == 0 && this->bus.writeableStatus.pulse1Enable) || (this->channel == 1 && this->bus.writeableStatus.pulse2Enable)) {
@@ -303,7 +317,8 @@ void Pulse::regWrite(uint16_t addr, uint8_t data) {
 void Pulse::clockEnvelope(void) {
     if (this->envelope.start == 1) {
         this->envelope.start = 0;
-        this->envelope.decayLevelCounter = 0;
+        this->envelope.decayLevelCounter = 15;
+        this->envelope.dividerCounter = this->envelope.volume;
     } else {
         // clock the envelope divider
         if (this->envelope.dividerCounter == 0) {
@@ -351,14 +366,21 @@ void Pulse::clockSweep(void) {
 
 void Pulse::clockSweepDivider(void) {
     // 当shiftCounter为0时，相当于enable为0的效果
-    if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0 && this->sweep.output) {
-        // 更新方波通道的周期
-        this->timerLoad = this->sweep.targetPeriod;
+    if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0) {
+        if (this->sweep.output) {
+            // 更新方波通道的周期
+            this->timerLoad = this->sweep.targetPeriod;
+        } else {
+            this->sweep.dividerCounter = this->sweep.dividerLoad;
+        }
     }
     if (this->sweep.dividerCounter == 0 || this->sweep.reload) {
+        if (this->sweep.enable && this->sweep.shiftCounter != 0) {
+            this->timerLoad = this->sweep.targetPeriod;
+        }
         this->sweep.reload = 0;
         this->sweep.dividerCounter = this->sweep.dividerLoad;
-    } else {
+    } else if (this->sweep.enable) {
         this->sweep.dividerCounter--;
     }
 }

@@ -243,7 +243,7 @@ union APUFRAMECOUNTER {
     uint8_t value;
     struct {
         uint8_t counter : 6;
-        uint8_t interruptInhibit : 1; // Interrupt inhibit flag. If set, the frame interrupt flag is cleared, otherwise it is unaffected.
+        uint8_t interruptInhibit : 1; // 中断禁止标识符，如果为1，则清除frame interrupt 标识符
         uint8_t mode : 1; // Sequencer mode: 0 selects 4-step sequence, 1 selects 5-step sequence
     };
 };

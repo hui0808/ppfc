@@ -5,9 +5,20 @@ alignas(8) static uint8_t *audioBuffer;
 static uint16_t audioBufferSamplePos;
 static uint16_t audioBufferFillPos;
 static uint16_t audioBufferSize;
-//alignas(8) static uint8_t *recordBuffer;
-//uint32_t recordSize = 512 * 1024;
+alignas(8) static uint8_t *recordBuffer;
+uint32_t recordSize = 10 * 1024;
 void fillAudioDataCallback(void *userdata, uint8_t *stream, int length) {
+    /**
+     * baseSeq = range(基本频率) * 占空比
+     * omiga = 0
+     * len = 4096
+     * while (len > 0) {
+     *   index = round((omiga % 实际频率) / (实际频率 / 基本频率))
+     *   omiga = (omiga + 1) % 实际频率
+     *   len--
+     *   output = baseSeq[index]
+     * }
+     */
     SDL_memset(stream, 0, length);
     if (audioBufferSize == 0) return;
     if (length > audioBufferSize) length = audioBufferSize;
@@ -36,6 +47,7 @@ void Speaker::init(void) {
     audioBufferSamplePos = 0;
     audioBufferFillPos = 0;
     audioBufferSize = 0;
+    recordBuffer = new uint8_t[recordSize]{0};
     this->spec.freq = 48000;
     this->spec.format = AUDIO_U8;
     this->spec.channels = 1;
@@ -55,14 +67,27 @@ void Speaker::run(void) {
         while (true) {
             if (this->bus.status == PPFC_STOP) break;
             uint64_t now = SDL_GetPerformanceCounter();
-            auto interval = static_cast<uint16_t>(std::round(SDL_GetPerformanceFrequency() / 48000.0f));
-            if (now -this->last < interval) {
-                SDL_Delay(1);
+            uint64_t f = SDL_GetPerformanceFrequency();
+            auto interval = static_cast<uint16_t>(std::round(f / 48000.0f));
+            if (now - this->last < interval) {
+//                SDL_Delay(1);
             } else {
                 this->last = now;
                 audioBuffer[audioBufferSamplePos] = this->bus.apu.output;
                 audioBufferSamplePos = (audioBufferSamplePos + 1) % 4096;
                 audioBufferSize++;
+//                if (recordBuffer != nullptr) {
+//                    recordBuffer[10 * 1024 - recordSize] = this->bus.apu.output;
+//                    recordSize--;
+//                    if (recordSize == 0) {
+//                        FILE *file = fopen("./record.pcm", "wb");
+//                        fseek(file, 0, SEEK_SET);
+//                        fwrite(recordBuffer, 1, 10 * 1024, file);
+//                        fclose(file);
+//                        recordBuffer = nullptr;
+//                        printf("done\n");
+//                    }
+//                }
             }
         }
     });
