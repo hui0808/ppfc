@@ -132,8 +132,8 @@ public:
     void run(void);
     void regWrite(uint16_t addr, uint8_t data);
     void clockEnvelope(void);
+    void trackSweep(void);
     void clockSweep(void);
-    void clockSweepDivider(void);
     void clockLengthCounter(void);
 
     struct PulseReg0 {
@@ -239,13 +239,10 @@ union APU_READABLE_STATUS {
     };
 };
 
-union APUFRAMECOUNTER {
-    uint8_t value;
-    struct {
-        uint8_t counter : 6;
-        uint8_t interruptInhibit : 1; // 中断禁止标识符，如果为1，则清除frame interrupt 标识符
-        uint8_t mode : 1; // Sequencer mode: 0 selects 4-step sequence, 1 selects 5-step sequence
-    };
+struct FrameCounter {
+    uint8_t counter;
+    uint8_t interruptInhibit;
+    uint8_t mode;
 };
 
 class APU {
@@ -258,7 +255,7 @@ public:
     DMCREG dmcChannel;
     APU_WRITEABLE_STATUS writeableStatus;
     APU_READABLE_STATUS readableStatus;
-    APUFRAMECOUNTER frameCounter;
+    FrameCounter frameCounter;
     uint32_t cycle;
     uint8_t output;
 
@@ -279,6 +276,13 @@ public:
     void statusRegWrite(uint16_t addr, uint8_t data);
     void frameCounterRegWrite(uint16_t addr, uint8_t data);
     void mix();
+
+    // $4017 reg
+    struct FrameCounterReg {
+        uint8_t unused : 6;
+        uint8_t interruptInhibit : 1; // 中断禁止标识符，如果为1，则清除frame interrupt 标识符
+        uint8_t mode : 1; // Sequencer mode: 0 selects 4-step sequence, 1 selects 5-step sequence
+    };
 };
 
 #endif // __PPFC_APU_H__

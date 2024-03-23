@@ -16,9 +16,9 @@ void APU::reset(void) {
     memset(&this->triangleChannel, 0, sizeof(this->triangleChannel));
     memset(&this->noiseChannel, 0, sizeof(this->noiseChannel));
     memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
+    memset(&this->frameCounter, 0, sizeof(this->frameCounter));
     this->writeableStatus.status = 0;
     this->readableStatus.status = 0;
-    this->frameCounter.value = 0;
     this->cycle = 0;
     this->output = 0;
 }
@@ -42,13 +42,13 @@ void APU::run(void) {
 
 void APU::mix(void) {
     // https://www.nesdev.org/wiki/APU_Mixer
-//    float pulseOut = 0;
-//    float fndOut = 0;
-//    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
-//        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
-//    }
-//    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
-    uint8_t output = uint8_t ((this->pulseChannel1.output + this->pulseChannel2.output) * 8.5 + 0.5);
+    float pulseOut = 0;
+    float fndOut = 0;
+    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
+        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
+    }
+    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
+//    uint8_t output = uint8_t ((this->pulseChannel1.output + this->pulseChannel2.output) * 8.5 + 0.5);
     this->output = output;
 }
 
@@ -97,8 +97,8 @@ void APU::clockLengthCounter() {
 }
 
 void APU::clockSweepUnit() {
-    this->pulseChannel1.clockSweepDivider();
-    this->pulseChannel2.clockSweepDivider();
+    this->pulseChannel1.clockSweep();
+    this->pulseChannel2.clockSweep();
 }
 
 void APU::clockEnvelope() {
@@ -197,7 +197,9 @@ void APU::statusRegWrite(uint16_t addr, uint8_t data) {
 
 void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
     // $4017
-    this->frameCounter.value = data;
+    auto &frameCounterReg = (FrameCounterReg&)data;
+    this->frameCounter.mode = frameCounterReg.mode;
+    this->frameCounter.interruptInhibit = frameCounterReg.interruptInhibit;
     this->cycle = 0;
     if (this->frameCounter.interruptInhibit) {
         this->readableStatus.frameCounterInterrupt = 0;
@@ -237,7 +239,7 @@ void Pulse::reset(void) {
 
 void Pulse::run(void) {
     // 扫描单元会持续不断地扫描
-    this->clockSweep();
+    this->trackSweep();
     // clock 8-step sequencer by timer
     // 方波周期 = 8 * (timer + 1) * APU cycles
     if (this->timer == 0) {
@@ -278,30 +280,30 @@ void Pulse::run(void) {
 
 void Pulse::regWrite(uint16_t addr, uint8_t data) {
     if (addr == 0x4000 || addr == 0x4004) {
-        auto *reg = (PulseReg0*)(&data);
-        this->duty = reg->duty;
-        this->lengthCounterHalt = reg->lengthCounterHalt;
+        auto &reg = (PulseReg0&)data;
+        this->duty = reg.duty;
+        this->lengthCounterHalt = reg.lengthCounterHalt;
         // Halt length counter is also the envelope's loop flag
-        this->envelope.loop = reg->lengthCounterHalt;
-        this->envelope.constantVolume = reg->constantVolume;
-        this->envelope.volume = reg->volume;
+        this->envelope.loop = reg.lengthCounterHalt;
+        this->envelope.constantVolume = reg.constantVolume;
+        this->envelope.volume = reg.volume;
     } else if (addr == 0x4001 || addr == 0x4005) {
-        auto *reg = (PulseReg1*)(&data);
-        this->sweep.enable = reg->sweepEnable;
-        this->sweep.dividerLoad = reg->sweepPeriod;
-        this->sweep.negate = reg->sweepNegate;
-        this->sweep.shiftCounter = reg->sweepShiftCount;
+        auto &reg = (PulseReg1&)data;
+        this->sweep.enable = reg.sweepEnable;
+        this->sweep.dividerLoad = reg.sweepPeriod;
+        this->sweep.negate = reg.sweepNegate;
+        this->sweep.shiftCounter = reg.sweepShiftCount;
         // side effect
         this->sweep.reload = 1;
     } else if (addr == 0x4002 || addr == 0x4006) {
-        auto *reg = (PulseReg2*)(&data);
+        auto &reg = (PulseReg2&)data;
         // 更新定时器d0-d7
-        this->timerLoad = (this->timerLoad & 0x0700) | reg->timerLow;
+        this->timerLoad = (this->timerLoad & 0x0700) | reg.timerLow;
     } else if (addr == 0x4003 || addr == 0x4007) {
-        auto *reg = (PulseReg3*)(&data);
+        auto &reg = (PulseReg3&)data;
         // 更新定时器d8-d10
-        this->timerLoad = (this->timerLoad & 0x00FF) | (uint16_t)(reg->timerHigh << 8);
-        this->lengthCounterLoad = reg->lengthCounterLoad;
+        this->timerLoad = (this->timerLoad & 0x00FF) | (uint16_t)(reg.timerHigh << 8);
+        this->lengthCounterLoad = reg.lengthCounterLoad;
         // https://forums.nesdev.org/viewtopic.php?p=186129#p186129
         // 清空 sequencers，重置相位
         this->sequencer = 0;
@@ -343,7 +345,7 @@ void Pulse::clockEnvelope(void) {
 }
 
 
-void Pulse::clockSweep(void) {
+void Pulse::trackSweep(void) {
     // https://www.nesdev.org/wiki/APU_Sweep
     uint16_t changeAmount = this->timerLoad >> this->sweep.shiftCounter;
     // timer是11bit
@@ -364,20 +366,13 @@ void Pulse::clockSweep(void) {
     }
 }
 
-void Pulse::clockSweepDivider(void) {
+void Pulse::clockSweep(void) {
     // 当shiftCounter为0时，相当于enable为0的效果
-    if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0) {
-        if (this->sweep.output) {
-            // 更新方波通道的周期
-            this->timerLoad = this->sweep.targetPeriod;
-        } else {
-            this->sweep.dividerCounter = this->sweep.dividerLoad;
-        }
+    if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0 && this->sweep.output) {
+        // 更新方波通道的周期
+        this->timerLoad = this->sweep.targetPeriod;
     }
     if (this->sweep.dividerCounter == 0 || this->sweep.reload) {
-        if (this->sweep.enable && this->sweep.shiftCounter != 0) {
-            this->timerLoad = this->sweep.targetPeriod;
-        }
         this->sweep.reload = 0;
         this->sweep.dividerCounter = this->sweep.dividerLoad;
     } else if (this->sweep.enable) {
@@ -386,7 +381,9 @@ void Pulse::clockSweepDivider(void) {
 }
 
 void Pulse::clockLengthCounter(void) {
-    if (this->lengthCounter > 0 && this->lengthCounterHalt == 0) {
+    if (!this->enable) {
+        this->lengthCounter = 0;
+    } else if (this->lengthCounter > 0 && this->lengthCounterHalt == 0) {
         this->lengthCounter--;
     }
 }
