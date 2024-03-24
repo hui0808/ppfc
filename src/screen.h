@@ -5,6 +5,8 @@
 
 class PPFC;
 
+#pragma pack(push, 1)
+
 class Screen {
 public:
     PPFC& bus;
@@ -26,5 +28,5 @@ public:
     void quit(void);
     void resize(SDL_Event& event);
 };
-
+#pragma pack(pop)
 #endif // __PPFC_SCREEN_H__

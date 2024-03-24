@@ -6,6 +6,8 @@
 
 class PPFC;
 
+#pragma pack(push, 1)
+
 union PPUCTRL {
     uint8_t ctrl;
     struct {
@@ -74,8 +76,8 @@ public:
     uint8_t spindexes[32] = {0}; // 调色板索引
     uint8_t oam[256] = {0}; // 精灵数据, 有64个4 byte 精灵
     Palette palette[64] = {0}; // 调色板
-    alignas(8) uint32_t *buffer; // 显示缓存
-    alignas(8) uint32_t *buf;
+    uint32_t *buffer; // 显示缓存
+    uint32_t *buf;
 
     Memory memory;
 
@@ -127,6 +129,8 @@ public:
 
 extern const Palette gpalette[64];
 extern const uint16_t colorEmphasisFactor[8][3];
+
+#pragma pack(pop)
 
 #endif // __PPFC_PPU_H__
 
