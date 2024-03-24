@@ -37,19 +37,6 @@ void APU::run(void) {
             this->clockFrameCounter();
     }
     if (this->cycle == 14914) this->cycle = 0;
-    this->mix();
-}
-
-void APU::mix(void) {
-    // https://www.nesdev.org/wiki/APU_Mixer
-    float pulseOut = 0;
-    float fndOut = 0;
-    if (this->pulseChannel1.output != 0 || this->pulseChannel2.output != 0) {
-        pulseOut = 95.88f / (8128.0f / (this->pulseChannel1.output + this->pulseChannel2.output) + 100.0f);
-    }
-    uint8_t output = uint8_t((pulseOut + fndOut) * 255 + 0.5);
-//    uint8_t output = uint8_t ((this->pulseChannel1.output + this->pulseChannel2.output) * 8.5 + 0.5);
-    this->output = output;
 }
 
 void APU::clockFrameCounter() {
@@ -102,7 +89,7 @@ void APU::clockSweepUnit() {
 }
 
 void APU::clockEnvelope() {
-   this->pulseChannel1.clockEnvelope();
+    this->pulseChannel1.clockEnvelope();
     this->pulseChannel2.clockEnvelope();
 }
 
@@ -234,7 +221,6 @@ void Pulse::reset(void) {
     this->lengthCounter = 0;
     this->lengthCounterLoad = 0;
     this->lengthCounterHalt = 0;
-    this->output = 0;
 }
 
 void Pulse::run(void) {
@@ -267,10 +253,10 @@ void Pulse::run(void) {
         this->timer--;
     }
     // 方波输出
-    if (this->enable && this->sweep.output != 0 && this->sequencerOutput != 0 && this->lengthCounter != 0) {
-        this->output = this->envelope.output;
+    if (this->enable && this->sweep.output != 0 && this->lengthCounter != 0) {
+        this->mute = 0;
     } else {
-        this->output = 0;
+        this->mute = 1;
     }
 //    printf("sweep output: %d, sequencer output: %d, length counter: %d, output: %d\n", this->sweep.output, this->sequencerOutput, this->lengthCounter, this->output);
 //    if (this->channel == 2) {

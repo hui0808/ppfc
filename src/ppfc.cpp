@@ -41,7 +41,6 @@ void PPFC::run(void) {
                 // each apu run, cpu run 2 times, ppu run 6 times
                 if (counter == 0) this->apu.run();
                 this->ppu.run();
-//                this->speaker.sample();
                 counter = (counter + 1) % (PPU_CPU_CLOCK_RATIO * CPU_APU_CLOCK_RATIO);
             } while (this->ppu.frameClock != NTSC_CYCLES * 241 + 1);
             break;
@@ -56,7 +55,6 @@ void PPFC::run(void) {
         this->screen.render();
         this->handleEvent();
     }
-    this->speaker.task.join();
     this->quit();
 }
 

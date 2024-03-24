@@ -83,6 +83,7 @@
 class PPFC;
 class APU;
 
+#pragma pack(push, 1)
 const uint8_t lengthTable[0x20] = {
         10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
     12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
@@ -124,7 +125,7 @@ public:
     uint8_t lengthCounter; // 时长计数器
     uint8_t lengthCounterLoad;
     uint8_t lengthCounterHalt;
-    uint8_t output;
+    uint8_t mute = 1;
 
     Pulse(APU& bus, uint8_t channel);
     void reset(void);
@@ -250,12 +251,12 @@ public:
     PPFC& bus;
     Pulse pulseChannel1;
     Pulse pulseChannel2;
-    TRIANGLEREG triangleChannel;
-    NOISEREG noiseChannel;
-    DMCREG dmcChannel;
-    APU_WRITEABLE_STATUS writeableStatus;
-    APU_READABLE_STATUS readableStatus;
-    FrameCounter frameCounter;
+    TRIANGLEREG triangleChannel = {0};
+    NOISEREG noiseChannel = {0};
+    DMCREG dmcChannel = {0};
+    APU_WRITEABLE_STATUS writeableStatus = {0};
+    APU_READABLE_STATUS readableStatus = {0};
+    FrameCounter frameCounter = {0};
     uint32_t cycle;
     uint8_t output;
 
@@ -275,7 +276,6 @@ public:
     uint8_t statusRegRead(uint16_t addr);
     void statusRegWrite(uint16_t addr, uint8_t data);
     void frameCounterRegWrite(uint16_t addr, uint8_t data);
-    void mix();
 
     // $4017 reg
     struct FrameCounterReg {
@@ -284,5 +284,6 @@ public:
         uint8_t mode : 1; // Sequencer mode: 0 selects 4-step sequence, 1 selects 5-step sequence
     };
 };
+#pragma pack(pop)
 
 #endif // __PPFC_APU_H__

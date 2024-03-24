@@ -1,38 +1,28 @@
 #include "ppfc.h"
 #include "speaker.h"
 
-alignas(8) static uint8_t *audioBuffer;
-static uint16_t audioBufferSamplePos;
-static uint16_t audioBufferFillPos;
-static uint16_t audioBufferSize;
-alignas(8) static uint8_t *recordBuffer;
-uint32_t recordSize = 10 * 1024;
+const static float dutyTable[] = {0.125f, 0.25f, 0.5f, 0.75f};
+
+
+
+float approxSin(float t) {
+    float j = t * 0.15915;
+    j = j - (int)j;
+    return 20.785 * j * (j - 0.5) * (j - 1.0);
+}
+
+uint8_t clamp(float value, uint8_t low, uint8_t high) {
+    if (value < low) return low;
+    else if (value > high) return high;
+    else return uint8_t(value);
+};
+
 void fillAudioDataCallback(void *userdata, uint8_t *stream, int length) {
-    /**
-     * baseSeq = range(基本频率) * 占空比
-     * omiga = 0
-     * len = 4096
-     * while (len > 0) {
-     *   index = round((omiga % 实际频率) / (实际频率 / 基本频率))
-     *   omiga = (omiga + 1) % 实际频率
-     *   len--
-     *   output = baseSeq[index]
-     * }
-     */
+    auto self = (Speaker*)userdata;
     SDL_memset(stream, 0, length);
-    if (audioBufferSize == 0) return;
-    if (length > audioBufferSize) length = audioBufferSize;
-    if (audioBufferFillPos + length > 4096) {
-        uint16_t len = 4096 - audioBufferFillPos;
-        SDL_memcpy(stream, audioBuffer + audioBufferFillPos, len);
-        stream += len;
-        length -= len;
-        audioBufferFillPos = 0;
-        audioBufferSize -= len;
+    for (int i = 0; i < length; i++) {
+        stream[i] = self->sample(i);
     }
-    SDL_memcpy(stream, audioBuffer + audioBufferFillPos, length);
-    audioBufferFillPos += length;
-    audioBufferSize -= length;
 }
 
 Speaker::Speaker(PPFC &bus) : bus(bus) {}
@@ -42,81 +32,63 @@ void Speaker::init(void) {
         error(format("Speaker: could not initialize SDL2: %s", SDL_GetError()));
     }
     SDL_memset(&this->spec, 0, sizeof(this->spec));
-//    recordBuffer = new uint8_t[recordSize]{0};
-    audioBuffer = new uint8_t[4096]{0};
-    audioBufferSamplePos = 0;
-    audioBufferFillPos = 0;
-    audioBufferSize = 0;
-    recordBuffer = new uint8_t[recordSize]{0};
-    this->spec.freq = 48000;
+    this->spec.freq = this->sampleFreq;
     this->spec.format = AUDIO_U8;
     this->spec.channels = 1;
     this->spec.silence = 0;
-    this->spec.samples = 1024;
+    this->spec.samples = this->sampleSize;
     this->spec.callback = fillAudioDataCallback;
-    if (SDL_OpenAudio(&this->spec, nullptr) < 0){
+    this->spec.userdata = this;
+    if (SDL_OpenAudio(&this->spec, nullptr) < 0) {
         printf("can't open audio.\n");
     }
-    this->last = SDL_GetPerformanceCounter();
-//    printf("first counter: %lu, f: %lu\n", this->last, SDL_GetPerformanceFrequency());
-    SDL_PauseAudio(0);
 }
 
 void Speaker::run(void) {
-    this->task = std::thread([this]() {
-        while (true) {
-            if (this->bus.status == PPFC_STOP) break;
-            uint64_t now = SDL_GetPerformanceCounter();
-            uint64_t f = SDL_GetPerformanceFrequency();
-            auto interval = static_cast<uint16_t>(std::round(f / 48000.0f));
-            if (now - this->last < interval) {
-//                SDL_Delay(1);
-            } else {
-                this->last = now;
-                audioBuffer[audioBufferSamplePos] = this->bus.apu.output;
-                audioBufferSamplePos = (audioBufferSamplePos + 1) % 4096;
-                audioBufferSize++;
-//                if (recordBuffer != nullptr) {
-//                    recordBuffer[10 * 1024 - recordSize] = this->bus.apu.output;
-//                    recordSize--;
-//                    if (recordSize == 0) {
-//                        FILE *file = fopen("./record.pcm", "wb");
-//                        fseek(file, 0, SEEK_SET);
-//                        fwrite(recordBuffer, 1, 10 * 1024, file);
-//                        fclose(file);
-//                        recordBuffer = nullptr;
-//                        printf("done\n");
-//                    }
-//                }
-            }
-        }
-    });
+    SDL_PauseAudio(0);
 }
 
-void Speaker::sample(void) {
-//    uint64_t now = SDL_GetPerformanceCounter();
-//    auto interval = static_cast<uint16_t>(std::round(SDL_GetPerformanceFrequency() / 48000.0f));
-////    printf("now: %lu, last: %lu, now-last: %lu\n", now, this->last, now - this->last);
-//    if (now - this->last >= interval) {
-//        audioBuffer[audioBufferSamplePos] = this->bus.apu.output;
-//        audioBufferSamplePos = (audioBufferSamplePos + 1) % 4096;
-//        audioBufferSize++;
-//        if (recordBuffer != nullptr) {
-//            recordBuffer[512 * 1024 - recordSize] = this->bus.apu.output;
-//            recordSize--;
-//            if (recordSize == 0) {
-//                FILE* file = fopen("./record.pcm", "wb");
-//                fseek(file, 0, SEEK_SET);
-//                fwrite(recordBuffer, 512 * 1024, 1, file);
-//                fclose(file);   // 关闭文件
-//                recordBuffer = nullptr;
-//                printf("done\n");
-//                printf("end counter: %lu, f: %lu\n", now, SDL_GetPerformanceFrequency());
-//            }
-//        }
-//
-////        SDL_QueueAudio(1, &this->bus.apu.output, 1);
-////        printf("\rAudio sample frequency: %.2f", float(1000/dtime));
-//        this->last = now;
-//    }
+uint8_t Speaker::sample(int seqIndex) {
+    this->t = (float)this->clock / (float)this->sampleFreq;
+    this->clock = (this->clock + 1) % (this->sampleFreq);
+    float pulse0 = this->samplePulse(0);
+    float pulse1 = this->samplePulse(1);
+    // mixer
+    // output = pulse_out + tnd_out
+    //
+    //                            95.88
+    //pulse_out = ------------------------------------
+    //             (8128 / (pulse1 + pulse2)) + 100
+    //
+    //                                       159.79
+    //tnd_out = -------------------------------------------------------------
+    //                                    1
+    //           ----------------------------------------------------- + 100
+    //            (triangle / 8227) + (noise / 12241) + (dmc / 22638)
+    float pulse = 0;
+    float tnd = 0;
+    if (pulse0 >= 0.01f || pulse1 >= 0.01f) {
+        pulse = 95.88f / (8128.0f / float(pulse0 + pulse1) + 100.0f);
+    }
+    uint8_t output = clamp((pulse + tnd) * 127.0f, 0, 255);
+    return output;
+}
+
+float Speaker::samplePulse(uint8_t channel) {
+    Pulse *pulse = channel == 0 ? &this->bus.apu.pulseChannel1 : &this->bus.apu.pulseChannel2;
+    if (pulse->mute) return 0;
+    uint8_t amplitude = pulse->envelope.output;
+    float freq = 111860.8f / (float(this->bus.apu.pulseChannel1.timerLoad) + 1);
+    float duty = dutyTable[pulse->duty];
+    float p = 2 * 3.14159f * duty;
+    float omega = 2 * 3.14159f * freq;
+    float y1 = 0;
+    float y2 = 0;
+    for (uint32_t n = 1; n < this->harmonics; n++) {
+        float phase = omega * float(n) * t;
+        y1 += sin(phase) / float(n);
+        y2 += sin(phase - p * float(n)) / float(n);
+    }
+    float output = float(amplitude) / 3.14159f * (y1 - y2) + 3 * duty * float(amplitude) / 3.14159f;
+    return output;
 }
