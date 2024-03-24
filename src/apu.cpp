@@ -11,17 +11,18 @@ APU::APU(PPFC& bus):
     bus(bus),
     pulseChannel1(*this, 0),
     pulseChannel2(*this, 1),
-    triangleChannel(*this) {}
+    triangleChannel(*this),
+    noiseChannel(*this) {}
 
 void APU::init(void) {
     this->pulseChannel1.init();
     this->pulseChannel2.init();
     this->triangleChannel.init();
+    this->noiseChannel.init();
     this->reset();
 }
 
 void APU::reset(void) {
-    memset(&this->noiseChannel, 0, sizeof(this->noiseChannel));
     memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
     memset(&this->frameCounter, 0, sizeof(this->frameCounter));
     this->writeableStatus.status = 0;
@@ -89,6 +90,7 @@ void APU::clockLengthCounter() {
     this->pulseChannel1.clockLengthCounter();
     this->pulseChannel2.clockLengthCounter();
     this->triangleChannel.clockLengthCounter();
+    this->noiseChannel.clockLengthCounter();
 }
 
 void APU::clockSweepUnit() {
@@ -99,6 +101,7 @@ void APU::clockSweepUnit() {
 void APU::clockEnvelope() {
     this->pulseChannel1.clockEnvelope();
     this->pulseChannel2.clockEnvelope();
+    this->noiseChannel.clockEnvelope();
 }
 
 void APU::clockLinearCounter() {
@@ -123,12 +126,8 @@ void APU::channelRegWrite(uint16_t addr, uint8_t data) {
         this->triangleChannel.regWrite(addr, data);
     }
     // noise channel $400C-$400F, $400D unused
-    else if (addr == 0x400C) {
-        *(uint8_t*)(&this->noiseChannel.reg0) = data;
-    } else if (addr == 0x400E) {
-        *(uint8_t*)(&this->noiseChannel.reg1) = data;
-    } else if (addr == 0x400F) {
-        *(uint8_t*)(&this->noiseChannel.reg2) = data;
+    else if (0x400C <= addr && addr <= 0x400F) {
+        this->noiseChannel.regWrite(addr, data);
     }
     // dmc channel $4010-$4013
     else if (addr == 0x4010) {
@@ -153,6 +152,9 @@ uint8_t APU::statusRegRead(uint16_t addr) {
     }
     if (this->triangleChannel.enable != 0 && this->triangleChannel.lengthCounter > 0) {
         this->readableStatus.triangleLengthCounterZero = 1;
+    }
+    if (this->noiseChannel.enable != 0 && this->noiseChannel.lengthCounter > 0) {
+        this->readableStatus.noiseLengthCounterZero = 1;
     }
     if (this->dmcChannel.sampleLength > 0) {
         this->readableStatus.dmcActive = 1;
@@ -187,6 +189,13 @@ void APU::statusRegWrite(uint16_t addr, uint8_t data) {
     } else {
         this->triangleChannel.enable = 0;
         this->triangleChannel.lengthCounter = 0;
+    }
+    if (this->writeableStatus.noiseEnable) {
+        this->noiseChannel.enable = 1;
+        this->noiseChannel.lengthCounter = lengthTable[this->noiseChannel.lengthCounterLoad];
+    } else {
+        this->noiseChannel.enable = 0;
+        this->noiseChannel.lengthCounter = 0;
     }
     // clear dmc interrupt flag
     this->dmcChannel.reg0.irqEnable = 0;
@@ -226,6 +235,8 @@ uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
 //    float pulse1 = 0;
     float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
 //    float triangle = 0;
+//    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
+    float noise = 0;
     // mixer
     // output = pulse_out + tnd_out
     //
@@ -243,10 +254,10 @@ uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
     if (pulse0 >= 0.01f || pulse1 >= 0.01f) {
         pulse = 95.88f / (8128.0f / float(pulse0 + pulse1) + 100.0f);
     }
-    if (triangle >= 0.01f) {
-        tnd = 159.79f / (1 / (triangle / 8227.0f) + 100.0f);
+    if (triangle >= 0.01f || noise >= 0.01f) {
+        tnd = 159.79f / (1 / (triangle / 8227.0f + noise / 12241.0f) + 100.0f);
     }
-    uint8_t output = clamp((pulse + tnd) * 127.0f, 0, 127);
+    uint8_t output = clamp((pulse + tnd) * 127.0f, 0, 255);
     return output;
 }
 
@@ -363,7 +374,6 @@ void Pulse::clockEnvelope(void) {
             this->envelope.dividerCounter--;
         }
     }
-    // TODO，更新时机
     // update envelope sequencerOutput
     if (this->envelope.constantVolume) {
         this->envelope.output = this->envelope.volume;
@@ -506,9 +516,85 @@ uint8_t Triangle::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
     // 三角波频率 = Fcpu / (32 * (timer + 1))
     float freq = 55930.4f / (float(this->timerLoad) + 1.f);
     // 三角波当前执行了多少个周期
+//    float period = float(this->bus.bus.cpu.cycle) / freq;
     float period = float(sampleIndex) / freq;
     // 取period小数部分
     float phase = period - int(period);
     return triangleSeqTable[int(phase * 32)];
 }
 
+Noise::Noise(APU &bus) : bus(bus) {}
+
+void Noise::init(void) {
+    this->reset();
+}
+
+void Noise::reset(void) {
+    this->envelope = {0};
+    this->loop = 0;
+    this->timerLoad = 0;
+    this->timer = 0;
+    this->lengthCounter = 0;
+    this->lengthCounterLoad = 0;
+    this->lengthCounterHalt = 0;
+    // TODO
+    this->shiftCounter = 0;
+}
+
+void Noise::run(void) {
+
+}
+
+void Noise::regWrite(uint16_t addr, uint8_t data) {
+    if (addr == 0x400C) {
+        auto &reg = (NoiseReg0&)data;
+        this->envelope.volume = reg.volume;
+        this->envelope.constantVolume = reg.constantVolume;
+        this->envelope.loop = reg.lengthCounterHalt;
+        this->lengthCounterHalt = reg.lengthCounterHalt;
+    } else if (addr == 0x400E) {
+        auto &reg = (NoiseReg2&)data;
+        this->timerLoad = noiseTimerTable[reg.timerLoad];
+        this->loop = reg.loop;
+    } else if (addr == 0x400F) {
+        auto &reg = (NoiseReg3&)data;
+        this->lengthCounterLoad = reg.lengthCounterLoad;
+        // side effect
+        this->envelope.start = 1;
+    }
+}
+
+void Noise::clockEnvelope(void) {
+    if (this->envelope.start == 1) {
+        this->envelope.start = 0;
+        this->envelope.decayLevelCounter = 15;
+        this->envelope.dividerCounter = this->envelope.volume;
+    } else {
+        // clock the envelope divider
+        if (this->envelope.dividerCounter == 0) {
+            this->envelope.dividerCounter = this->envelope.volume; // reload
+            // clock the decay level counter
+            // loop 为1，则15到0循环，否则直到0为止
+            if (this->envelope.decayLevelCounter != 0) this->envelope.decayLevelCounter--;
+            else if (this->envelope.loop) {
+                this->envelope.decayLevelCounter = 15;
+            }
+        } else {
+            this->envelope.dividerCounter--;
+        }
+    }
+    // update envelope sequencerOutput
+    if (this->envelope.constantVolume) {
+        this->envelope.output = this->envelope.volume;
+    } else {
+        this->envelope.output = this->envelope.dividerCounter;
+    }
+}
+
+void Noise::clockLengthCounter(void) {
+
+}
+
+uint8_t Noise::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
+    return 0;
+}

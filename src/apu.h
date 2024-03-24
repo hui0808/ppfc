@@ -97,6 +97,7 @@ static const uint8_t triangleSeqTable[] = {
 
 static const float dutyTable[] = {0.125f, 0.25f, 0.5f, 0.75f};
 
+static const uint16_t noiseTimerTable[] = {4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068};
 
 struct Envelope {
     uint8_t start; // start flag
@@ -206,23 +207,43 @@ public:
     };
 };
 
-struct NOISEREG {
-    struct {
-        uint8_t volume : 4;  // volume/envelope divider period
-        uint8_t constantVolume : 1;  // constant volume/envelope flag
-        uint8_t lengthCounterHalt : 1; // length counter halt flag
+class Noise {
+public:
+    uint8_t enable;
+    APU& bus;
+    Envelope envelope;
+    uint8_t loop; // 是否循环
+    uint16_t timerLoad;
+    uint16_t timer;
+    uint8_t lengthCounter; // 时长计数器
+    uint8_t lengthCounterLoad;
+    uint8_t lengthCounterHalt;
+    uint16_t shiftCounter;
+
+    Noise(APU& bus);
+    void init(void);
+    void reset(void);
+    void run(void);
+    void regWrite(uint16_t addr, uint8_t data);
+    void clockEnvelope(void);
+    void clockLengthCounter(void);
+    uint8_t sample(uint32_t sampleFreq, uint32_t sampleIndex);
+
+    struct NoiseReg0 {
+        uint8_t volume : 4;
+        uint8_t constantVolume : 1;
+        uint8_t lengthCounterHalt : 1;
         uint8_t unused : 2;
-    } reg0;
-    struct {
-        uint8_t noisePeriod : 4;
+    };
+    struct NoiseReg2 {
+        uint8_t timerLoad : 4;
         uint8_t unused : 3;
-        uint8_t noiseEnable : 1;
-    } reg1;
-    struct {
+        uint8_t loop : 1;
+    };
+    struct NoiseReg3 {
         uint8_t unused : 3;
         uint8_t lengthCounterLoad : 5;
-    } reg2;
-    uint8_t lengthCounter;
+    };
 };
 
 // TODO: DMC
@@ -281,7 +302,7 @@ public:
     Pulse pulseChannel1;
     Pulse pulseChannel2;
     Triangle triangleChannel;
-    NOISEREG noiseChannel = {0};
+    Noise noiseChannel;
     DMCREG dmcChannel = {0};
     APU_WRITEABLE_STATUS writeableStatus = {0};
     APU_READABLE_STATUS readableStatus = {0};
