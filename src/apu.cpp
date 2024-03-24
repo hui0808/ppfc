@@ -1,19 +1,26 @@
 #include "ppfc.h"
 #include "apu.h"
 
+uint8_t clamp(float value, uint8_t low, uint8_t high) {
+    if (value < low) return low;
+    else if (value > high) return high;
+    else return uint8_t(value);
+};
+
 APU::APU(PPFC& bus):
     bus(bus),
     pulseChannel1(*this, 0),
-    pulseChannel2(*this, 1) {}
+    pulseChannel2(*this, 1),
+    triangleChannel(*this) {}
 
 void APU::init(void) {
     this->pulseChannel1.init();
     this->pulseChannel2.init();
+    this->triangleChannel.init();
     this->reset();
 }
 
 void APU::reset(void) {
-    memset(&this->triangleChannel, 0, sizeof(this->triangleChannel));
     memset(&this->noiseChannel, 0, sizeof(this->noiseChannel));
     memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
     memset(&this->frameCounter, 0, sizeof(this->frameCounter));
@@ -81,6 +88,7 @@ void APU::clockFrameCounter() {
 void APU::clockLengthCounter() {
     this->pulseChannel1.clockLengthCounter();
     this->pulseChannel2.clockLengthCounter();
+    this->triangleChannel.clockLengthCounter();
 }
 
 void APU::clockSweepUnit() {
@@ -94,7 +102,7 @@ void APU::clockEnvelope() {
 }
 
 void APU::clockLinearCounter() {
-
+    this->triangleChannel.clockLinearCounter();
 }
 
 uint8_t APU::channelRegRead(uint16_t addr) {
@@ -110,14 +118,9 @@ void APU::channelRegWrite(uint16_t addr, uint8_t data) {
     } else if (0x4004 <= addr && addr <= 0x4007) {
         this->pulseChannel2.regWrite(addr, data);
     }
-
-    // triangle channel $4008-$400B, $4009 unused
-    else if (addr == 0x4008) {
-        *(uint8_t*)(&this->triangleChannel.reg0) = data;
-    } else if (addr == 0x400A) {
-        *(uint8_t*)(&this->triangleChannel.reg1) = data;
-    } else if (addr == 0x400B) {
-        *(uint8_t*)(&this->triangleChannel.reg2) = data;
+    // triangle channel $4008-$400B
+    else if (0x4008 <= addr && addr <= 0x400B) {
+        this->triangleChannel.regWrite(addr, data);
     }
     // noise channel $400C-$400F, $400D unused
     else if (addr == 0x400C) {
@@ -148,6 +151,9 @@ uint8_t APU::statusRegRead(uint16_t addr) {
     if (this->pulseChannel2.enable != 0 && this->pulseChannel2.lengthCounter > 0) {
         this->readableStatus.pulse2LengthCounterZero = 1;
     }
+    if (this->triangleChannel.enable != 0 && this->triangleChannel.lengthCounter > 0) {
+        this->readableStatus.triangleLengthCounterZero = 1;
+    }
     if (this->dmcChannel.sampleLength > 0) {
         this->readableStatus.dmcActive = 1;
     }
@@ -159,18 +165,28 @@ uint8_t APU::statusRegRead(uint16_t addr) {
 
 void APU::statusRegWrite(uint16_t addr, uint8_t data) {
     // status register $4015
+    // d4-d0为DNT21通道使能位，写入0都会使其静音以及清除其长度计数器
     this->writeableStatus.status = data;
     if (this->writeableStatus.pulse1Enable) {
+        this->pulseChannel1.enable = 1;
         this->pulseChannel1.lengthCounter = lengthTable[this->pulseChannel1.lengthCounterLoad];
     } else {
         this->pulseChannel1.enable = 0;
         this->pulseChannel1.lengthCounter = 0;
     }
     if (this->writeableStatus.pulse2Enable) {
-        this->pulseChannel2.enable = 0;
+        this->pulseChannel2.enable = 1;
         this->pulseChannel2.lengthCounter = lengthTable[this->pulseChannel2.lengthCounterLoad];
     } else {
+        this->pulseChannel2.enable = 0;
         this->pulseChannel2.lengthCounter = 0;
+    }
+    if (this->writeableStatus.triangleEnable) {
+        this->triangleChannel.enable = 1;
+        this->triangleChannel.lengthCounter = lengthTable[this->triangleChannel.lengthCounterLoad];
+    } else {
+        this->triangleChannel.enable = 0;
+        this->triangleChannel.lengthCounter = 0;
     }
     // clear dmc interrupt flag
     this->dmcChannel.reg0.irqEnable = 0;
@@ -203,6 +219,37 @@ void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
      */
 }
 
+uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
+    float pulse0 = this->pulseChannel1.sample(sampleFreq, sampleIndex);
+//    float pulse0 = 0;
+    float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
+//    float pulse1 = 0;
+    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
+//    float triangle = 0;
+    // mixer
+    // output = pulse_out + tnd_out
+    //
+    //                            95.88
+    //pulse_out = ------------------------------------
+    //             (8128 / (pulse1 + pulse2)) + 100
+    //
+    //                                       159.79
+    //tnd_out = -------------------------------------------------------------
+    //                                    1
+    //           ----------------------------------------------------- + 100
+    //            (triangle / 8227) + (noise / 12241) + (dmc / 22638)
+    float pulse = 0;
+    float tnd = 0;
+    if (pulse0 >= 0.01f || pulse1 >= 0.01f) {
+        pulse = 95.88f / (8128.0f / float(pulse0 + pulse1) + 100.0f);
+    }
+    if (triangle >= 0.01f) {
+        tnd = 159.79f / (1 / (triangle / 8227.0f) + 100.0f);
+    }
+    uint8_t output = clamp((pulse + tnd) * 127.0f, 0, 127);
+    return output;
+}
+
 Pulse::Pulse(APU& bus, uint8_t channel) : channel(channel), bus(bus) {}
 
 void Pulse::init(void) {
@@ -225,7 +272,6 @@ void Pulse::reset(void) {
 
 void Pulse::run(void) {
     // 扫描单元会持续不断地扫描
-    this->trackSweep();
     // clock 8-step sequencer by timer
     // 方波周期 = 8 * (timer + 1) * APU cycles
     if (this->timer == 0) {
@@ -258,10 +304,6 @@ void Pulse::run(void) {
     } else {
         this->mute = 1;
     }
-//    printf("sweep output: %d, sequencer output: %d, length counter: %d, output: %d\n", this->sweep.output, this->sequencerOutput, this->lengthCounter, this->output);
-//    if (this->channel == 2) {
-//        printf("pulse output: %d\n", this->output);
-//    }
 }
 
 void Pulse::regWrite(uint16_t addr, uint8_t data) {
@@ -353,6 +395,7 @@ void Pulse::trackSweep(void) {
 }
 
 void Pulse::clockSweep(void) {
+    this->trackSweep();
     // 当shiftCounter为0时，相当于enable为0的效果
     if (this->sweep.dividerCounter == 0 && this->sweep.enable && this->sweep.shiftCounter != 0 && this->sweep.output) {
         // 更新方波通道的周期
@@ -374,4 +417,98 @@ void Pulse::clockLengthCounter(void) {
     }
 }
 
+float Pulse::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
+    if (this->mute) return 0;
+    uint8_t amplitude = this->envelope.output;
+    float freq = 111860.8f / (float(this->timerLoad) + 1);
+    float duty = dutyTable[this->duty];
+    float p = 2 * 3.14159f * duty;
+    float omega = 2 * 3.14159f * freq;
+    float y1 = 0;
+    float y2 = 0;
+    float t = float(sampleIndex) / float(sampleFreq);
+    for (uint32_t n = 1; n < 20; n++) {
+        float phase = omega * float(n) * t;
+        y1 += sin(phase) / float(n);
+        y2 += sin(phase - p * float(n)) / float(n);
+    }
+    float output = float(amplitude) / 3.141579f * (y1 - y2) + 3 * duty * float(amplitude) / 3.14159f;
+    return output;
+}
+
+
+Triangle::Triangle(APU &bus) : bus(bus) {}
+
+void Triangle::init(void) {
+    this->reset();
+}
+
+void Triangle::reset(void) {
+    this->enable = 0;
+    this->linearCounter = 0;
+    this->linearCounterReLoad = 0;
+    this->linearCounterHalt = 0;
+    this->linearCounterLoad = 0;
+    this->lengthCounter = 0;
+    this->lengthCounterLoad = 0;
+    this->timerLoad = 0;
+    this->timer = 0;
+    this->sequencer = 0;
+}
+
+void Triangle::regWrite(uint16_t addr, uint8_t data) {
+    if (addr == 0x4008) {
+        auto &reg = (TriangleReg0&)data;
+        this->linearCounterHalt = reg.linearCounterHalt;
+        this->linearCounterLoad = reg.linearCounterLoad;
+    } else if (addr == 0x400A) {
+        auto &reg = (TriangleReg2&)data;
+        // 更新定时器d0-d7
+        this->timerLoad = (this->timerLoad & 0x0700) | reg.timerLow;
+    } else if (addr == 0x400B) {
+        auto &reg = (TriangleReg3&)data;
+        // 更新定时器d8-d10
+        this->timerLoad = (this->timerLoad & 0x00FF) | (uint16_t)(reg.timerHigh << 8);
+        this->lengthCounterLoad = reg.lengthCounterLoad;
+        // side effect
+        this->linearCounterReLoad = 1;
+    }
+}
+
+void Triangle::run(void) {}
+
+void Triangle::clockLinearCounter(void) {
+    if (!this->enable) {
+        this->linearCounter = 0;
+    } else if (this->linearCounterReLoad) {
+        this->linearCounter = this->linearCounterLoad;
+    } else if (this->linearCounter != 0) {
+        this->linearCounter--;
+    }
+    // 暂停线性计数器也会暂停清除reload标志位
+    if (this->linearCounterHalt == 0) {
+        this->linearCounterReLoad = 0;
+    }
+}
+
+void Triangle::clockLengthCounter(void) {
+    if (!this->enable) {
+        this->lengthCounter = 0;
+    } else if (this->lengthCounter > 0 && this->linearCounterHalt == 0) {
+        this->lengthCounter--;
+    }
+}
+
+uint8_t Triangle::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
+    if (!this->enable || this->linearCounter == 0 || this->lengthCounter == 0) {
+        return 0;
+    }
+    // 三角波频率 = Fcpu / (32 * (timer + 1))
+    float freq = 55930.4f / (float(this->timerLoad) + 1.f);
+    // 三角波当前执行了多少个周期
+    float period = float(sampleIndex) / freq;
+    // 取period小数部分
+    float phase = period - int(period);
+    return triangleSeqTable[int(phase * 32)];
+}
 

@@ -84,10 +84,19 @@ class PPFC;
 class APU;
 
 #pragma pack(push, 1)
-const uint8_t lengthTable[0x20] = {
-        10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
+
+static const uint8_t lengthTable[] = {
+    10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
     12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
 };
+
+static const uint8_t triangleSeqTable[] = {
+    15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15
+};
+
+static const float dutyTable[] = {0.125f, 0.25f, 0.5f, 0.75f};
+
 
 struct Envelope {
     uint8_t start; // start flag
@@ -136,6 +145,7 @@ public:
     void trackSweep(void);
     void clockSweep(void);
     void clockLengthCounter(void);
+    float sample(uint32_t sampleFreq, uint32_t sampleIndex);
 
     struct PulseReg0 {
         uint8_t volume : 4;  // volume/envelope divider period
@@ -158,23 +168,42 @@ public:
     };
 };
 
-struct TRIANGLEREG {
-    // $4008
-    struct {
-        uint8_t linearCounterReloadValue : 7;
-        uint8_t linearCounterControlFlag : 1; // also the length counter halt flag
-    } reg0; // Linear counter setup
-    // $4009 unused
-    // $400A
-    struct {
-        uint8_t timerLow : 8;
-    } reg1;
-    // $400B
-    struct {
-        uint8_t timerHigh : 3;
-        uint8_t lengthCounterLoad : 5;
-    } reg2;
+class Triangle {
+public:
+    uint8_t enable;
+    APU& bus;
+    Sweep sweep;
+    uint8_t linearCounter;
+    uint8_t linearCounterReLoad; // 重载线性计数器标志位
+    uint8_t linearCounterHalt;
+    uint8_t linearCounterLoad;
     uint8_t lengthCounter;
+    uint8_t lengthCounterLoad;
+    uint8_t timerLoad;
+    uint8_t timer;
+    uint8_t sequencer;
+
+
+    Triangle(APU& bus);
+    void init(void);
+    void reset(void);
+    void run(void);
+    void regWrite(uint16_t addr, uint8_t data);
+    void clockLinearCounter(void);
+    void clockLengthCounter(void);
+    uint8_t sample(uint32_t sampleFreq, uint32_t sampleIndex);
+
+    struct TriangleReg0 {
+        uint8_t linearCounterHalt : 1; // 用于暂停长度计数器以及控制线性计数器
+        uint8_t linearCounterLoad : 7; // 线性计数器重载值
+    };
+    struct TriangleReg2 {
+        uint8_t timerLow : 8; // b0 - b7 of 11-bits timerLoad
+    };
+    struct TriangleReg3 {
+        uint8_t timerHigh : 3; // b8 - b10 of 11-bits timerLoad
+        uint8_t lengthCounterLoad : 5; // 长度计数器重载值
+    };
 };
 
 struct NOISEREG {
@@ -251,7 +280,7 @@ public:
     PPFC& bus;
     Pulse pulseChannel1;
     Pulse pulseChannel2;
-    TRIANGLEREG triangleChannel = {0};
+    Triangle triangleChannel;
     NOISEREG noiseChannel = {0};
     DMCREG dmcChannel = {0};
     APU_WRITEABLE_STATUS writeableStatus = {0};
@@ -276,6 +305,8 @@ public:
     uint8_t statusRegRead(uint16_t addr);
     void statusRegWrite(uint16_t addr, uint8_t data);
     void frameCounterRegWrite(uint16_t addr, uint8_t data);
+
+    uint8_t sample(uint32_t sampleFreq, uint32_t sampleIndex);
 
     // $4017 reg
     struct FrameCounterReg {
