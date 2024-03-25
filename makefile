@@ -4,7 +4,7 @@
 CC = g++
 
 # Compiler flags
-CFLAGS = -std=c++11 -Wall -O1 -g
+CFLAGS = -std=c++11 -Wall -g
 
 # Include directories
 ifeq ($(OS),Windows_NT)

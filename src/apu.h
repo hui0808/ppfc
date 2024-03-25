@@ -218,7 +218,8 @@ public:
     uint8_t lengthCounter; // 时长计数器
     uint8_t lengthCounterLoad;
     uint8_t lengthCounterHalt;
-    uint16_t shiftCounter;
+    uint16_t sequencer; // lfsr 序列器
+    uint8_t sequencerOutput;
 
     Noise(APU& bus);
     void init(void);
@@ -227,7 +228,7 @@ public:
     void regWrite(uint16_t addr, uint8_t data);
     void clockEnvelope(void);
     void clockLengthCounter(void);
-    uint8_t sample(uint32_t sampleFreq, uint32_t sampleIndex);
+    float sample(uint32_t sampleFreq, uint32_t sampleIndex);
 
     struct NoiseReg0 {
         uint8_t volume : 4;
@@ -309,6 +310,7 @@ public:
     FrameCounter frameCounter = {0};
     uint32_t cycle;
     uint8_t output;
+    float samplePos; // 当前采样的位置 0~sample
 
     APU(PPFC& bus);
     void reset(void);

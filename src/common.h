@@ -26,5 +26,12 @@
 #include <SDL2/SDL.h> // Linux
 #endif
 
+#define LogFPS() { \
+    static uint64_t __last__ = 0; \
+    uint64_t __now__ = SDL_GetPerformanceCounter(); \
+    float __fps__ = float(SDL_GetPerformanceFrequency()) / (__now__ - __last__); \
+    __last__ = __now__; \
+    printf("%f\n", __fps__); \
+}
 
 #endif // __PPFU_COMMON_H__

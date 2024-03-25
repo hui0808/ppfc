@@ -16,6 +16,8 @@ using EventCallBack = std::function<void(SDL_Event&)>;
 using EventPair = std::pair<uint16_t, EventCallBack>;
 using EventList = std::vector<EventPair>;
 
+#pragma pack(push, 1)
+
 enum PPFCStatus {
     PPFC_RUN,
     PPFC_RESET,
@@ -48,5 +50,7 @@ public:
     void quit(void);
     void quit(SDL_Event& event);
 };
+
+#pragma pack(pop)
 
 #endif // __PPFC_H__

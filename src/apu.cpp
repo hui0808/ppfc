@@ -35,8 +35,6 @@ void APU::run(void) {
     this->cycle++;
     // https://www.nesdev.org/wiki/APU_Frame_Counter
     // 每隔大约1/4帧时间就会触发一次
-    if (this->writeableStatus.pulse1Enable) this->pulseChannel1.run();
-    if (this->writeableStatus.pulse2Enable) this->pulseChannel2.run();
     switch (this->cycle) {
         case 3728:
         case 7456:
@@ -44,9 +42,18 @@ void APU::run(void) {
         case 14914:
             this->clockFrameCounter();
     }
+    this->pulseChannel1.run();
+    this->pulseChannel2.run();
+    this->triangleChannel.run();
+    this->noiseChannel.run();
+    float latestSamplePos = this->cycle * 44100 / (CPU_CYCLES_PER_SEC / 2);
+    if (latestSamplePos - this->samplePos > 0.99f) {
+        // 触发一次采样
+        this->samplePos = latestSamplePos;
+    }
+
     if (this->cycle == 14914) this->cycle = 0;
 }
-
 void APU::clockFrameCounter() {
     if (this->frameCounter.mode == 0) {
         // 4-step sequence
@@ -229,14 +236,14 @@ void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
 }
 
 uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-    float pulse0 = this->pulseChannel1.sample(sampleFreq, sampleIndex);
-//    float pulse0 = 0;
-    float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
-//    float pulse1 = 0;
-    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
-//    float triangle = 0;
-//    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
-    float noise = 0;
+//    float pulse0 = this->pulseChannel1.sample(sampleFreq, sampleIndex);
+    float pulse0 = 0;
+//    float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
+    float pulse1 = 0;
+//    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
+    float triangle = 0;
+    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
+//    float noise = 0;
     // mixer
     // output = pulse_out + tnd_out
     //
@@ -285,6 +292,7 @@ void Pulse::run(void) {
     // 扫描单元会持续不断地扫描
     // clock 8-step sequencer by timer
     // 方波周期 = 8 * (timer + 1) * APU cycles
+    if (!this->enable) return;
     if (this->timer == 0) {
         this->timer = this->timerLoad;
         switch (this->duty) {
@@ -387,15 +395,18 @@ void Pulse::trackSweep(void) {
     // https://www.nesdev.org/wiki/APU_Sweep
     uint16_t changeAmount = this->timerLoad >> this->sweep.shiftCounter;
     // timer是11bit
-    if (this->sweep.negate) {
-        // 减少周期
-        this->sweep.targetPeriod = this->timerLoad - changeAmount;
-        if (this->channel == 0) this->sweep.targetPeriod--;
-    } else {
-        // 增加周期
-        this->sweep.targetPeriod = this->timerLoad + changeAmount;
+    if (this->sweep.enable && this->sweep.shiftCounter > 0) {
+        if (this->sweep.negate) {
+            // 减少周期
+            this->sweep.targetPeriod = this->timerLoad - changeAmount;
+            if (this->channel == 0) this->sweep.targetPeriod--;
+        } else {
+            // 增加周期
+            this->sweep.targetPeriod = this->timerLoad + changeAmount;
+        }
     }
     // targetPeriod 溢出了或者当前周期小于8，需要钳制为0，且使通道静音
+    // sweep 禁用不影响静音逻辑
     if ((this->sweep.targetPeriod > (this->channel == 0 ? 0x07FE : 0x07FF)) || this->timerLoad < 8) {
         this->sweep.targetPeriod = 0;
         this->sweep.output = 0;
@@ -537,12 +548,25 @@ void Noise::reset(void) {
     this->lengthCounter = 0;
     this->lengthCounterLoad = 0;
     this->lengthCounterHalt = 0;
-    // TODO
-    this->shiftCounter = 0;
+    this->sequencer = 1; // lfsr 初始值
+    this->sequencerOutput = 0;
 }
 
 void Noise::run(void) {
-
+    if (!this->enable || this->lengthCounter == 0) return;
+    if (this->timer == 0) {
+        this->timer = this->timerLoad;
+        // lfsr 逻辑
+        // 1. 反馈值计算：loop为1，结果为b0与b6异或，否则结果为b0与b1
+        // 2. 寄存器右移1位
+        // 3. 寄存器b14设置位反馈值
+        uint8_t op = this->loop ? ((this->sequencer >> 6) & 0x01) : ((this->sequencer >> 1) & 0x01);
+        uint8_t fallback = (this->sequencer & 0x01) ^ op;
+        this->sequencer = (this->sequencer >> 1) | (fallback << 14);
+        this->sequencerOutput = this->sequencer & 0x01;
+    } else {
+        this->timer--;
+    }
 }
 
 void Noise::regWrite(uint16_t addr, uint8_t data) {
@@ -592,9 +616,20 @@ void Noise::clockEnvelope(void) {
 }
 
 void Noise::clockLengthCounter(void) {
-
+    if (!this->enable) {
+        this->lengthCounter = 0;
+    } else if (this->lengthCounter > 0 && this->lengthCounterHalt == 0) {
+        this->lengthCounter--;
+    }
 }
 
-uint8_t Noise::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-    return 0;
+float Noise::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
+    for (uint8_t i = 0; i < 41; i++) {
+        this->run();
+    }
+    if (this->enable == 0 || this->sequencerOutput == 0 || this->lengthCounter == 0) {
+        return 0;
+    } else {
+        return float(this->envelope.output);
+    }
 }

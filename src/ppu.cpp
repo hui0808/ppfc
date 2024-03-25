@@ -66,8 +66,10 @@ void PPU::memoryInit() {
 }
 
 void PPU::run(void) {
-    if (this->frameClock < NTSC_CYCLES * NTSC_POSTRENDER_LINE) { // visible scanlines 0~239
-        if (this->cycle < 256) { // cycle 0~255 visible scanlines render
+    // 0~239的扫描行是可见扫描行
+    if (this->frameClock < NTSC_CYCLES * NTSC_POSTRENDER_LINE) {
+        // 可见扫描行中的0~255的扫描周期是可见扫描周期，进行画面渲染
+        if (this->cycle < 256) {
             this->render();
         } else if (this->cycle == 320) { // sprite evaluation
             if (this->mask.background || this->mask.sprite) {
@@ -78,10 +80,12 @@ void PPU::run(void) {
                 this->yInc();
             }
         }
-    } else if (this->frameClock == NTSC_CYCLES * NTSC_VBLANK + 0) { // set vblank flag 241
+    // 扫描行241的第一个扫描周期，进行VBLANK
+    } else if (this->frameClock == NTSC_CYCLES * NTSC_VBLANK + 0) {
         this->preVblank = this->status.vblank;
         this->status.vblank = 1;
         this->buffer = this->buf; // reset to (0, 0)
+    // 扫描行261的第一个扫描周期，进行pre-render
     } else if (this->frameClock == NTSC_CYCLES * NTSC_PRERENDER_LINE + 0) { // pre-render line 261 cycle 1 clear vblank
         this->preVblank = this->status.vblank;
         this->status.vblank = 0;
@@ -91,15 +95,16 @@ void PPU::run(void) {
             this->vaddr = this->tmpvaddr;
             this->finex = this->tmpfinex;
         }
+    // 扫描行262的倒数第2个扫描周期
     } else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 2) {
         if (this->odd && (this->mask.background || this->mask.sprite)) {
             this->frameClock = 0;
             this->cycle = 0;
             this->scanline = 0;
             this->odd = 0;
-            // TODO: frameRateLimit
             return;
         }
+    // 扫描行262的倒数第1个扫描周期
     } else if (this->frameClock == NTSC_CYCLES * NTSC_SCANLINE - 1) {
         this->frameClock = 0;
         this->cycle = 0;
@@ -107,7 +112,6 @@ void PPU::run(void) {
         if (this->mask.background || this->mask.sprite) {
             this->odd = 1;
         }
-        // TODO: frameRateLimit
         return;
     }
     this->frameRateLimit();
