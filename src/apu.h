@@ -311,6 +311,8 @@ public:
     uint32_t cycle;
     uint8_t output;
     float samplePos; // 当前采样的位置 0~sample
+    uint8_t buffer[4096] = {0};
+    uint32_t bufferPos;
 
     APU(PPFC& bus);
     void reset(void);

@@ -25,10 +25,13 @@ void APU::init(void) {
 void APU::reset(void) {
     memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
     memset(&this->frameCounter, 0, sizeof(this->frameCounter));
+    memset(this->buffer, 0, sizeof(this->buffer));
+    this->bufferPos = 0;
     this->writeableStatus.status = 0;
     this->readableStatus.status = 0;
     this->cycle = 0;
     this->output = 0;
+    this->samplePos = 0;
 }
 
 void APU::run(void) {
@@ -44,15 +47,30 @@ void APU::run(void) {
     }
     this->pulseChannel1.run();
     this->pulseChannel2.run();
-    this->triangleChannel.run();
+//    this->triangleChannel.run();
+//    this->triangleChannel.run();
     this->noiseChannel.run();
-    float latestSamplePos = this->cycle * 44100 / (CPU_CYCLES_PER_SEC / 2);
-    if (latestSamplePos - this->samplePos > 0.99f) {
-        // 触发一次采样
-        this->samplePos = latestSamplePos;
+    this->noiseChannel.run();
+//    float latestSamplePos = this->cycle * 44100 / (CPU_CYCLES_PER_SEC / 2);
+//    if (latestSamplePos - this->samplePos > 0.99f) {
+//        // 触发一次采样
+//        if (this->bufferPos == 0) {
+//            SDL_LockAudio();
+//        }
+//        this->samplePos = latestSamplePos;
+//        this->buffer[this->bufferPos] = this->sample(44100, uint32_t(latestSamplePos));
+////        if (this->bufferPos == sizeof(this->buffer) - 1) {
+////            SDL_QueueAudio(1, this->buffer, sizeof(this->buffer));
+////        }
+//        if (this->bufferPos >= 2048) {
+//            SDL_UnlockAudio();
+//        }
+//        this->bufferPos = (this->bufferPos + 1) % sizeof(this->buffer);
+//    }
+    if (this->cycle == 14914) {
+//        this->samplePos = latestSamplePos - this->samplePos;
+        this->cycle = 0;
     }
-
-    if (this->cycle == 14914) this->cycle = 0;
 }
 void APU::clockFrameCounter() {
     if (this->frameCounter.mode == 0) {
@@ -236,14 +254,14 @@ void APU::frameCounterRegWrite(uint16_t addr, uint8_t data) {
 }
 
 uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-//    float pulse0 = this->pulseChannel1.sample(sampleFreq, sampleIndex);
-    float pulse0 = 0;
-//    float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
-    float pulse1 = 0;
-//    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
-    float triangle = 0;
-    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
-//    float noise = 0;
+    float pulse0 = this->pulseChannel1.sample(sampleFreq, sampleIndex);
+//    float pulse0 = 0;
+    float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
+//    float pulse1 = 0;
+    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
+//    float triangle = 0;
+//    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
+    float noise = 0;
     // mixer
     // output = pulse_out + tnd_out
     //
@@ -624,9 +642,9 @@ void Noise::clockLengthCounter(void) {
 }
 
 float Noise::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-    for (uint8_t i = 0; i < 41; i++) {
-        this->run();
-    }
+//    for (uint8_t i = 0; i < 41; i++) {
+//        this->run();
+//    }
     if (this->enable == 0 || this->sequencerOutput == 0 || this->lengthCounter == 0) {
         return 0;
     } else {

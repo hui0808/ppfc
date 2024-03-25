@@ -379,7 +379,7 @@ void PPU::yInc(void) {
 }
 
 void PPU::frameRateLimit(void) {
-    static const float perFrameTime = 1000.0f / NTSC_FRAME_RATE;
+    static const float perFrameTime = 1000.0f / 60;
     if (this->frameClock == 0) {
         float dtime = (SDL_GetPerformanceCounter() - this->last) / float(SDL_GetPerformanceFrequency()) * 1000.0f;
         int32_t d = int32_t(perFrameTime - dtime);
