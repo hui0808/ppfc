@@ -183,6 +183,7 @@ public:
     uint8_t timerLoad;
     uint8_t timer;
     uint8_t sequencer;
+    uint8_t output;
 
 
     Triangle(APU& bus);
@@ -311,8 +312,11 @@ public:
     uint32_t cycle;
     uint8_t output;
     float samplePos; // 当前采样的位置 0~sample
-    uint8_t buffer[4096] = {0};
-    uint32_t bufferPos;
+    uint32_t sampleDividerCounter;
+    uint8_t sampleBuffer[4096] = {0};
+    uint32_t writeBufferPos;
+    uint32_t readBufferPos;
+    int32_t sampleWriteReadDiff;
 
     APU(PPFC& bus);
     void reset(void);

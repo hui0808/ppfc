@@ -34,7 +34,7 @@
     printf("\r%.2f", __fps__); \
 }
 
-#define LogFPSDiv(div) { \
+#define Div(div, callback) { \
     static uint64_t __clock__ = 0; \
     static uint64_t __last2__ = 0;  \
     __clock__++;    \
@@ -42,9 +42,11 @@
         __clock__ = 0; \
         uint64_t __now__ = SDL_GetPerformanceCounter(); \
         float __fps__ = float(SDL_GetPerformanceFrequency()) / (__now__ - __last2__) * (div); \
-        printf("\r%.2f", __fps__); \
+        callback;\
         __last2__ = __now__; \
     }\
 }
+
+#define LogFPSDiv(div) Div(div, printf("\r%.2f", __fps__ / 20.0f))
 
 #endif // __PPFU_COMMON_H__

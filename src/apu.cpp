@@ -25,14 +25,21 @@ void APU::init(void) {
 void APU::reset(void) {
     memset(&this->dmcChannel, 0, sizeof(this->dmcChannel));
     memset(&this->frameCounter, 0, sizeof(this->frameCounter));
-    memset(this->buffer, 0, sizeof(this->buffer));
-    this->bufferPos = 0;
+    memset(this->sampleBuffer, 0, sizeof(this->sampleBuffer));
+    this->readBufferPos = 0;
+    this->writeBufferPos = sizeof(this->sampleBuffer);
+    this->samplePos = 0;
+    this->sampleDividerCounter = 0;
     this->writeableStatus.status = 0;
     this->readableStatus.status = 0;
     this->cycle = 0;
     this->output = 0;
     this->samplePos = 0;
+    this->sampleWriteReadDiff = 0;
 }
+
+extern uint64_t gApu;
+extern uint64_t gSpeaker;
 
 void APU::run(void) {
     this->cycle++;
@@ -47,28 +54,25 @@ void APU::run(void) {
     }
     this->pulseChannel1.run();
     this->pulseChannel2.run();
-//    this->triangleChannel.run();
-//    this->triangleChannel.run();
+    this->triangleChannel.run();
+    this->triangleChannel.run();
     this->noiseChannel.run();
     this->noiseChannel.run();
-//    float latestSamplePos = this->cycle * 44100 / (CPU_CYCLES_PER_SEC / 2);
-//    if (latestSamplePos - this->samplePos > 0.99f) {
-//        // 触发一次采样
-//        if (this->bufferPos == 0) {
-//            SDL_LockAudio();
-//        }
-//        this->samplePos = latestSamplePos;
-//        this->buffer[this->bufferPos] = this->sample(44100, uint32_t(latestSamplePos));
-////        if (this->bufferPos == sizeof(this->buffer) - 1) {
-////            SDL_QueueAudio(1, this->buffer, sizeof(this->buffer));
-////        }
-//        if (this->bufferPos >= 2048) {
-//            SDL_UnlockAudio();
-//        }
-//        this->bufferPos = (this->bufferPos + 1) % sizeof(this->buffer);
-//    }
+    static auto sampleDividerPeriod = uint32_t(float(CPU_CYCLES_PER_SEC) / 2.0f / float(this->bus.speaker.sampleFreq));
+    if (++this->sampleDividerCounter == sampleDividerPeriod) {
+        // 触发一次采样
+        this->sampleBuffer[this->writeBufferPos] = this->sample(44100, uint32_t(this->samplePos));
+        this->writeBufferPos = (this->writeBufferPos + 1) % sizeof(this->sampleBuffer);
+        this->sampleDividerCounter = 0;
+        this->samplePos++;
+        gApu++;
+        sampleWriteReadDiff++;
+        // 吃撑，消化一下
+        if (sampleWriteReadDiff >= sizeof(this->sampleBuffer) - 1) {
+            SDL_Delay(1);
+        }
+    }
     if (this->cycle == 14914) {
-//        this->samplePos = latestSamplePos - this->samplePos;
         this->cycle = 0;
     }
 }
@@ -258,8 +262,8 @@ uint8_t APU::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
 //    float pulse0 = 0;
     float pulse1 = this->pulseChannel2.sample(sampleFreq, sampleIndex);
 //    float pulse1 = 0;
-    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
-//    float triangle = 0;
+//    float triangle = this->triangleChannel.sample(sampleFreq, sampleIndex);
+    float triangle = 0;
 //    float noise = this->noiseChannel.sample(sampleFreq, sampleIndex);
     float noise = 0;
     // mixer
@@ -493,6 +497,7 @@ void Triangle::reset(void) {
     this->timerLoad = 0;
     this->timer = 0;
     this->sequencer = 0;
+    this->output = 0;
 }
 
 void Triangle::regWrite(uint16_t addr, uint8_t data) {
@@ -514,7 +519,19 @@ void Triangle::regWrite(uint16_t addr, uint8_t data) {
     }
 }
 
-void Triangle::run(void) {}
+void Triangle::run(void) {
+    if (!this->enable || this->linearCounter == 0 || this->lengthCounter == 0) {
+        this->output = 0;
+    }
+    // 三角波频率 = Fcpu / (32 * (timer + 1))
+    else if (this->timer == 0) {
+        this->timer = this->timerLoad;
+        this->output = triangleSeqTable[this->sequencer];
+        this->sequencer = (this->sequencer + 1) % 32;
+    } else {
+        this->timer--;
+    }
+}
 
 void Triangle::clockLinearCounter(void) {
     if (!this->enable) {
@@ -539,17 +556,7 @@ void Triangle::clockLengthCounter(void) {
 }
 
 uint8_t Triangle::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-    if (!this->enable || this->linearCounter == 0 || this->lengthCounter == 0) {
-        return 0;
-    }
-    // 三角波频率 = Fcpu / (32 * (timer + 1))
-    float freq = 55930.4f / (float(this->timerLoad) + 1.f);
-    // 三角波当前执行了多少个周期
-//    float period = float(this->bus.bus.cpu.cycle) / freq;
-    float period = float(sampleIndex) / freq;
-    // 取period小数部分
-    float phase = period - int(period);
-    return triangleSeqTable[int(phase * 32)];
+    return this->output;
 }
 
 Noise::Noise(APU &bus) : bus(bus) {}
@@ -642,9 +649,6 @@ void Noise::clockLengthCounter(void) {
 }
 
 float Noise::sample(uint32_t sampleFreq, uint32_t sampleIndex) {
-//    for (uint8_t i = 0; i < 41; i++) {
-//        this->run();
-//    }
     if (this->enable == 0 || this->sequencerOutput == 0 || this->lengthCounter == 0) {
         return 0;
     } else {

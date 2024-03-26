@@ -1,20 +1,26 @@
 #include "ppfc.h"
 #include "speaker.h"
 
-//uint32_t bufferSize = 0;
-//static uint8_t sampleStart = 0;
+uint64_t gApu = 0;
+uint64_t gSpeaker = 0;
 
 void fillAudioDataCallback(void *userdata, uint8_t *stream, int length) {
     auto self = (Speaker*)userdata;
+    auto apu = &self->bus.apu;
     SDL_memset(stream, 0, length);
-//    SDL_memcpy(stream, self->bus.apu.buffer + bufferSize, length);
-//    bufferSize += length;
-//    if (bufferSize >= 4096) {
-//        bufferSize = 0;
-//    }
-    for (int i = 0; i < length; i++) {
-        stream[i] = self->sample(i) * 0.5;
+    // 正常情况
+    if (apu->sampleWriteReadDiff >= length) {
+        SDL_memcpy(stream, apu->sampleBuffer + apu->readBufferPos, length);
+        apu->readBufferPos = (apu->readBufferPos + length) % sizeof(apu->sampleBuffer);
+        apu->sampleWriteReadDiff -= length;
+        gSpeaker += length;
     }
+    // 饥饿情况
+    else {
+        uint8_t data = apu->sampleBuffer[apu->readBufferPos];
+        SDL_memset(stream, data, length);
+    }
+    Div(2, printf("\rAPU: %llu, Speaker: %llu, diff: %d", gApu, gSpeaker, apu->sampleWriteReadDiff));
 }
 
 Speaker::Speaker(PPFC &bus) : bus(bus) {}
@@ -30,7 +36,6 @@ void Speaker::init(void) {
     this->spec.silence = 0;
     this->spec.samples = this->sampleSize;
     this->spec.callback = fillAudioDataCallback;
-//    this->spec.callback = nullptr;
     this->spec.userdata = this;
     if (SDL_OpenAudio(&this->spec, nullptr) < 0) {
         printf("can't open audio.\n");

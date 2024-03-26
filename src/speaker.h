@@ -10,7 +10,7 @@ public:
     PPFC& bus;
     uint32_t sampleIndex = 0;
     uint32_t sampleFreq = 44100;
-    uint32_t sampleSize = 512;
+    uint32_t sampleSize = 128;
     SDL_AudioSpec spec;
 
     Speaker(PPFC& bus);

@@ -51,9 +51,7 @@ void Screen::update(uint32_t *buffer) {
     SDL_LockTexture(this->texture, NULL, (void**)&pixels, &pitch);
     memcpy(pixels, buffer, uint32_t(pitch) * this->height);
     SDL_UnlockTexture(this->texture);
-//    if (this->bus.ppu.cycle < 3) {
-//        SDL_SetWindowTitle(this->window, format("%s  FPS:%.0f", this->title, this->bus.ppu.fps).c_str());
-//    }
+    Div(60, SDL_SetWindowTitle(this->window, format("%s FPS:%.0f", this->title, __fps__).c_str()));
 }
 
 void Screen::clear(void) {
