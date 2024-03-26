@@ -32,6 +32,18 @@ void PPFC::run(void) {
     this->status = PPFC_RUN;
     int counter = 0;
     this->speaker.run();
+//    std::thread task = std::thread([this]() {
+//        while (this->status == PPFC_RUN) {
+//            static uint64_t last = 0;
+//            uint64_t now = SDL_GetPerformanceCounter();
+//            if ((now - last) < SDL_GetPerformanceFrequency() / CPU_CYCLES_PER_SEC) {}
+//            else {
+////                printf("\rFPS: %.2f", float(SDL_GetPerformanceFrequency()) / float(now - last));
+//                last = now;
+////                LogFPSDiv(0xffff);
+//            }
+//        }
+//    });
     while (this->status != PPFC_STOP) {
         switch (this->status) {
         case(PPFC_RUN):
@@ -55,6 +67,7 @@ void PPFC::run(void) {
         this->screen.render();
         this->handleEvent();
     }
+//    task.join();
     this->quit();
 }
 

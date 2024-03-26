@@ -31,7 +31,20 @@
     uint64_t __now__ = SDL_GetPerformanceCounter(); \
     float __fps__ = float(SDL_GetPerformanceFrequency()) / (__now__ - __last__); \
     __last__ = __now__; \
-    printf("%f\n", __fps__); \
+    printf("\r%.2f", __fps__); \
+}
+
+#define LogFPSDiv(div) { \
+    static uint64_t __clock__ = 0; \
+    static uint64_t __last2__ = 0;  \
+    __clock__++;    \
+    if (__clock__ == (div)) {        \
+        __clock__ = 0; \
+        uint64_t __now__ = SDL_GetPerformanceCounter(); \
+        float __fps__ = float(SDL_GetPerformanceFrequency()) / (__now__ - __last2__) * (div); \
+        printf("\r%.2f", __fps__); \
+        __last2__ = __now__; \
+    }\
 }
 
 #endif // __PPFU_COMMON_H__
